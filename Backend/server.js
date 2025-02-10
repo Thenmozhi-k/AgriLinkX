@@ -16,7 +16,14 @@ connectDB();
 // app.get("/", (req, res) => {
 //   res.send("API is running...");
 // });
-app.use("/api/auth", require("./routes/authRoutes"));
+app.use("/api/auth", require("./routes/authUserRoutes"));
+app.use("/api", require("./routes/connectionRoutes"));
+
+
+
+
+
+
 app.get("/", (req, res) => {
     res.send("API is running... mongodb  connecteed successfully");
   });

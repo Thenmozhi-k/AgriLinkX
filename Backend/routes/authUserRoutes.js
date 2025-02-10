@@ -130,4 +130,5 @@ router.put("/user/update/:id", authMiddleware, async (req, res) => {
   }
 });
 
+
 module.exports = router;
