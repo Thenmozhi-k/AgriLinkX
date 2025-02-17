@@ -36,7 +36,8 @@ router.post(
       user = new User({
         name,
         email,
-        password: hashedPassword,
+        // password: hashedPassword,
+        password
       });
 
       await user.save();
