@@ -1,7 +1,12 @@
 import axios from 'axios';
-import { store } from '../app/store.js';
 
 const API_URL = 'http://localhost:5000/api';
+
+let storeRef = null;
+
+export const setStore = (store) => {
+  storeRef = store;
+};
 
 const api = axios.create({
   baseURL: API_URL,
@@ -10,10 +15,9 @@ const api = axios.create({
   },
 });
 
-// Request interceptor — attach auth token if available
 api.interceptors.request.use(
   (config) => {
-    const token = store.getState().auth.token;
+    const token = storeRef?.getState()?.auth?.token;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -22,7 +26,6 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor — handle 401 Unauthorized globally
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -31,8 +34,9 @@ api.interceptors.response.use(
     if (error.response && error.response.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
-      // Dispatch logout action to clear state/token and handle redirect elsewhere
-      store.dispatch({ type: 'auth/logout/fulfilled' });
+      if (storeRef) {
+        storeRef.dispatch({ type: 'auth/logout/fulfilled' });
+      }
     }
 
     return Promise.reject(error);

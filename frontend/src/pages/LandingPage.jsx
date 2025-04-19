@@ -5,9 +5,9 @@ import Footer from '../components/common/Footer';
 
 const LandingPage = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [authMode, setAuthMode] = useState('login');
   
-  const openAuthModal = (mode: 'login' | 'signup') => {
+  const openAuthModal = (mode) => {
     setAuthMode(mode);
     setShowAuthModal(true);
   };
@@ -248,7 +248,7 @@ const LandingPage = () => {
       </section>
 
       {/* Footer */}
-      <Footer />
+     
 
       {/* Authentication Modal */}
       {showAuthModal && (
