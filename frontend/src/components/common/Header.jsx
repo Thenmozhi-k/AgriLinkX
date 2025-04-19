@@ -1,6 +1,5 @@
-// src/components/common/Header.jsx
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../../app/hooks'; // Ensure correct path
 import { logout } from '../../features/auth/authSlice';
 import {
@@ -25,6 +24,7 @@ const Header = () => {
 
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, user } = useAppSelector((state) => state.auth);
   const { unreadCount } = useAppSelector((state) => state.notifications);
 
@@ -36,6 +36,11 @@ const Header = () => {
   const openAuthModal = (mode) => {
     setAuthMode(mode);
     setShowAuthModal(true);
+  };
+
+  // Check if the current path matches the given path
+  const isActive = (path) => {
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
 
   // Header for non-authenticated users (landing page)
@@ -153,28 +158,44 @@ const Header = () => {
           <nav className="hidden md:flex items-center space-x-6">
             <Link
               to="/home"
-              className="flex flex-col items-center text-primary-700 border-b-2 border-primary-600 px-2 pb-1"
+              className={`flex flex-col items-center ${
+                isActive('/home')
+                  ? 'text-primary-700 border-b-2 border-primary-600'
+                  : 'text-gray-500 hover:text-primary-600'
+              } px-2 pb-1`}
             >
               <Home className="h-6 w-6" />
               <span className="text-xs mt-1">Home</span>
             </Link>
             <Link
               to="/connections"
-              className="flex flex-col items-center text-gray-500 hover:text-primary-600 px-2 pb-1"
+              className={`flex flex-col items-center ${
+                isActive('/connections')
+                  ? 'text-primary-700 border-b-2 border-primary-600'
+                  : 'text-gray-500 hover:text-primary-600'
+              } px-2 pb-1`}
             >
               <Users className="h-6 w-6" />
               <span className="text-xs mt-1">My Network</span>
             </Link>
             <Link
               to="/messages"
-              className="flex flex-col items-center text-gray-500 hover:text-primary-600 px-2 pb-1"
+              className={`flex flex-col items-center ${
+                isActive('/messages')
+                  ? 'text-primary-700 border-b-2 border-primary-600'
+                  : 'text-gray-500 hover:text-primary-600'
+              } px-2 pb-1`}
             >
               <MessageSquare className="h-6 w-6" />
               <span className="text-xs mt-1">Messaging</span>
             </Link>
             <Link
               to="/notifications"
-              className="flex flex-col items-center text-gray-500 hover:text-primary-600 px-2 pb-1 relative"
+              className={`flex flex-col items-center ${
+                isActive('/notifications')
+                  ? 'text-primary-700 border-b-2 border-primary-600'
+                  : 'text-gray-500 hover:text-primary-600'
+              } px-2 pb-1 relative`}
             >
               <Bell className="h-6 w-6" />
               {unreadCount > 0 && (
@@ -244,7 +265,9 @@ const Header = () => {
             <nav className="flex flex-col">
               <Link
                 to="/home"
-                className="flex items-center space-x-3 px-4 py-3 text-primary-700 bg-primary-50"
+                className={`flex items-center space-x-3 px-4 py-3 ${
+                  isActive('/home') ? 'text-primary-700 bg-primary-50' : 'text-gray-700 hover:bg-gray-50'
+                }`}
                 onClick={() => setIsMenuOpen(false)}
               >
                 <Home className="h-6 w-6" />
@@ -252,7 +275,9 @@ const Header = () => {
               </Link>
               <Link
                 to="/connections"
-                className="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50"
+                className={`flex items-center space-x-3 px-4 py-3 ${
+                  isActive('/connections') ? 'text-primary-700 bg-primary-50' : 'text-gray-700 hover:bg-gray-50'
+                }`}
                 onClick={() => setIsMenuOpen(false)}
               >
                 <Users className="h-6 w-6" />
@@ -260,7 +285,9 @@ const Header = () => {
               </Link>
               <Link
                 to="/messages"
-                className="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50"
+                className={`flex items-center space-x-3 px-4 py-3 ${
+                  isActive('/messages') ? 'text-primary-700 bg-primary-50' : 'text-gray-700 hover:bg-gray-50'
+                }`}
                 onClick={() => setIsMenuOpen(false)}
               >
                 <MessageSquare className="h-6 w-6" />
@@ -268,15 +295,30 @@ const Header = () => {
               </Link>
               <Link
                 to="/notifications"
-                className="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50"
+                className={`flex items-center space-x-3 px-4 py-3 ${
+                  isActive('/notifications') ? 'text-primary-700 bg-primary-50' : 'text-gray-700 hover:bg-gray-50'
+                }`}
                 onClick={() => setIsMenuOpen(false)}
               >
                 <Bell className="h-6 w-6" />
                 <span>Notifications</span>
               </Link>
-              <button
-                onClick={handleLogout}
-                className="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50 w-full"
+              <Link
+                to="/profile"
+                className={`flex items-center space-x-3 px-4 py-3 ${
+                  isActive('/profile') ? 'text-primary-700 bg-primary-50' : 'text-gray-700 hover:bg-gray-50'
+                }`}
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <User className="h-6 w-6" />
+                <span>My Profile</span>
+              </Link>
+              <button 
+                onClick={() => {
+                  handleLogout();
+                  setIsMenuOpen(false);
+                }}
+                className="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50 w-full text-left"
               >
                 <LogOut className="h-6 w-6" />
                 <span>Sign Out</span>
