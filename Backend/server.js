@@ -4,6 +4,7 @@ const connectDB = require("./config/db");
 const cors = require("cors");
 const path = require("path"); // ✅ Import path module
 const postRoutes = require("./routes/postRoutes");
+const hashtagRoutes = require('./routes/hashtagRoutes');
 
 const app = express();
 
@@ -18,6 +19,7 @@ connectDB();
 app.use("/api/auth", require("./routes/authUserRoutes"));
 app.use("/api", require("./routes/connectionRoutes"));
 app.use("/api/post", postRoutes);
+app.use('/api/hashtags', hashtagRoutes);
 
 // ✅ Fix the incorrect path usage
 app.use("/uploads", express.static(path.join(__dirname, "uploads"))); 

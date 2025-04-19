@@ -6,7 +6,7 @@ const PostSchema = new mongoose.Schema(
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     description: { type: String, required: true },
     media: { type: String }, // URL of image or video
-    hashtags: { type: [String], default: [] },
+    hashtags: { type: [String], default: [], ref: "Hashtag" },
     reactions: [{ type: Map, of: Number, default: {} }], // like, love, etc.
     comments: [{ type: mongoose.Schema.Types.ObjectId, ref: "Comment" }],
     shares: { type: Number, default: 0 },
