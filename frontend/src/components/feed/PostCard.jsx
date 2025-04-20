@@ -1,11 +1,27 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { MessageSquare, Heart, Share2, MoreHorizontal, ThumbsUp } from 'lucide-react';
 import timeAgo from '../../utils/timeAgo';
 
 const PostCard = ({ post }) => {
   const [liked, setLiked] = useState(false);
-  const [likesCount, setLikesCount] = useState(post.likes);
+  const [likesCount, setLikesCount] = useState(post.likes || 0);
   const [showComments, setShowComments] = useState(false);
+  
+  // Create a safe local copy of post data
+  const postData = useMemo(() => {
+    return {
+      id: post._id || post.id,
+      content: post.content || post.description || '',
+      userName: post.userName || (post.userId && typeof post.userId === 'object' ? post.userId.name : 'User'),
+      userAvatar: post.userAvatar || (post.userId && typeof post.userId === 'object' ? post.userId.avatar : null),
+      hashtags: post.hashtags || [],
+      media: post.media || (post.images && post.images.length > 0 ? post.images[0] : null),
+      comments: post.comments || [],
+      commentsCount: typeof post.comments === 'number' ? post.comments : (Array.isArray(post.comments) ? post.comments.length : 0),
+      shares: post.shares || 0,
+      createdAt: post.createdAt || new Date().toISOString()
+    };
+  }, [post]);
   
   const handleLike = () => {
     if (liked) {
@@ -19,16 +35,32 @@ const PostCard = ({ post }) => {
     // postService.likePost(post.id);
   };
   
-  const formattedContent = post.content.split(' ').map((word, index) => {
-    if (word.startsWith('#')) {
-      return (
-        <span key={index} className="text-primary-600 hover:underline cursor-pointer">
-          {word}{' '}
-        </span>
-      );
+  // Safely format content with hashtag highlighting
+  const renderContent = () => {
+    if (!postData.content || typeof postData.content !== 'string') {
+      return null;
     }
-    return word + ' ';
-  });
+    
+    return postData.content.split(' ').map((word, index) => {
+      if (word.startsWith('#')) {
+        return (
+          <span key={index} className="text-primary-600 hover:underline cursor-pointer">
+            {word}{' '}
+          </span>
+        );
+      }
+      return word + ' ';
+    });
+  };
+  
+  // Get post date safely
+  const getPostDate = () => {
+    try {
+      return timeAgo(new Date(postData.createdAt));
+    } catch (e) {
+      return 'recently';
+    }
+  };
   
   return (
     <div className="bg-white rounded-lg shadow-sm overflow-hidden">
@@ -36,17 +68,17 @@ const PostCard = ({ post }) => {
       <div className="p-4 flex items-start justify-between">
         <div className="flex">
           <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
-            {post.userAvatar ? (
-              <img src={post.userAvatar} alt={post.userName} className="w-full h-full object-cover" />
+            {postData.userAvatar ? (
+              <img src={postData.userAvatar} alt={postData.userName} className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-primary-100 text-primary-700 font-medium">
-                {post.userName.charAt(0)}
+                {postData.userName.charAt(0)}
               </div>
             )}
           </div>
           <div>
-            <h3 className="font-medium text-gray-900">{post.userName}</h3>
-            <p className="text-gray-500 text-sm">{timeAgo(new Date(post.createdAt))}</p>
+            <h3 className="font-medium text-gray-900">{postData.userName}</h3>
+            <p className="text-gray-500 text-sm">{getPostDate()}</p>
           </div>
         </div>
         <button className="text-gray-500 hover:text-gray-700">
@@ -56,11 +88,11 @@ const PostCard = ({ post }) => {
       
       {/* Post Content */}
       <div className="px-4 pb-3">
-        <p className="text-gray-800 whitespace-pre-line">{formattedContent}</p>
+        <p className="text-gray-800 whitespace-pre-line">{renderContent()}</p>
         
-        {post.hashtags && post.hashtags.length > 0 && (
+        {postData.hashtags && postData.hashtags.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
-            {post.hashtags.map((tag, index) => (
+            {postData.hashtags.map((tag, index) => (
               <span key={index} className="text-primary-600 text-sm hover:underline cursor-pointer">
                 #{tag}
               </span>
@@ -70,16 +102,13 @@ const PostCard = ({ post }) => {
       </div>
       
       {/* Post Image(s) */}
-      {post.images && post.images.length > 0 && (
+      {postData.media && (
         <div className="mb-3">
-          {post.images.map((image, index) => (
-            <img 
-              key={index}
-              src={image} 
-              alt={`Post by ${post.userName}`} 
-              className="w-full h-auto"
-            />
-          ))}
+          <img 
+            src={postData.media} 
+            alt={`Post by ${postData.userName}`} 
+            className="w-full h-auto"
+          />
         </div>
       )}
       
@@ -96,10 +125,10 @@ const PostCard = ({ post }) => {
         
         <div className="flex space-x-4">
           <button onClick={() => setShowComments(!showComments)} className="hover:text-gray-700">
-            {post.comments} comments
+            {postData.commentsCount} comments
           </button>
           <button className="hover:text-gray-700">
-            {post.shares} shares
+            {postData.shares} shares
           </button>
         </div>
       </div>
@@ -160,57 +189,53 @@ const PostCard = ({ post }) => {
           </div>
           
           {/* Show a message if no comments yet */}
-          {post.comments === 0 && (
+          {postData.commentsCount === 0 && (
             <p className="text-center text-gray-500 text-sm">No comments yet. Be the first to comment!</p>
           )}
           
-          {/* Sample comments (would come from API in real app) */}
-          {post.comments > 0 && (
+          {/* Render actual comments if available */}
+          {Array.isArray(postData.comments) && postData.comments.length > 0 && (
             <div className="space-y-3">
-              <div className="flex">
-                <div className="w-8 h-8 rounded-full overflow-hidden mr-2 flex-shrink-0">
-                  <img 
-                    src="https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=150" 
-                    alt="Commenter" 
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div className="flex-1">
-                  <div className="bg-white p-2 rounded-lg">
-                    <p className="font-medium text-sm">Agricultural Expert</p>
-                    <p className="text-sm">Great insights! Have you tried implementing companion planting with your crops?</p>
-                  </div>
-                  <div className="flex items-center mt-1 text-xs text-gray-500 space-x-2">
-                    <button className="hover:text-gray-700">Like</button>
-                    <button className="hover:text-gray-700">Reply</button>
-                    <span>3h ago</span>
-                  </div>
-                </div>
-              </div>
-              
-              {post.comments > 1 && (
-                <div className="flex">
+              {postData.comments.map((comment, index) => (
+                <div key={index} className="flex">
                   <div className="w-8 h-8 rounded-full overflow-hidden mr-2 flex-shrink-0">
-                    <img 
-                      src="https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=150" 
-                      alt="Commenter" 
-                      className="w-full h-full object-cover"
-                    />
+                    {comment.userId && typeof comment.userId === 'object' && comment.userId.avatar ? (
+                      <img 
+                        src={comment.userId.avatar} 
+                        alt={comment.userId.name || 'Commenter'} 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-primary-100 text-primary-700 font-medium">
+                        {comment.userId && typeof comment.userId === 'object' && comment.userId.name 
+                          ? comment.userId.name.charAt(0) 
+                          : 'U'}
+                      </div>
+                    )}
                   </div>
                   <div className="flex-1">
                     <div className="bg-white p-2 rounded-lg">
-                      <p className="font-medium text-sm">AgriTech Solutions</p>
-                      <p className="text-sm">Would you be interested in testing our new soil monitoring system? It could help optimize your crop yield.</p>
+                      <p className="font-medium text-sm">
+                        {comment.userId && typeof comment.userId === 'object' && comment.userId.name 
+                          ? comment.userId.name 
+                          : 'User'}
+                      </p>
+                      <p className="text-sm">{comment.content}</p>
                     </div>
                     <div className="flex items-center mt-1 text-xs text-gray-500 space-x-2">
                       <button className="hover:text-gray-700">Like</button>
                       <button className="hover:text-gray-700">Reply</button>
-                      <span>2h ago</span>
+                      <span>{comment.createdAt ? timeAgo(new Date(comment.createdAt)) : 'recently'}</span>
                     </div>
                   </div>
                 </div>
-              )}
+              ))}
             </div>
+          )}
+          
+          {/* Fallback for when we have a count but no actual comments data */}
+          {postData.commentsCount > 0 && (!Array.isArray(postData.comments) || postData.comments.length === 0) && (
+            <p className="text-center text-gray-500 text-sm">Comments are loading...</p>
           )}
         </div>
       )}

@@ -40,7 +40,10 @@ const ConnectionSuggestions = () => {
 
       <div className="space-y-4">
         {profile.suggestions.map((suggestion) => (
-          <div key={suggestion.id} className="flex items-start">
+          <div 
+            key={suggestion._id || suggestion.id || `suggestion-${suggestion.name}-${Math.random().toString(36).substr(2, 9)}`} 
+            className="flex items-start"
+          >
             <div className="w-12 h-12 rounded-full overflow-hidden mr-3">
               {suggestion.avatar ? (
                 <img src={suggestion.avatar} alt={suggestion.name} className="w-full h-full object-cover" />
@@ -55,7 +58,7 @@ const ConnectionSuggestions = () => {
               <p className="text-gray-500 text-sm capitalize">{suggestion.role}</p>
               <div className="flex space-x-2 mt-2">
                 <button
-                  onClick={() => handleFollow(suggestion.id)}
+                  onClick={() => handleFollow(suggestion._id || suggestion.id)}
                   className="flex items-center px-3 py-1 bg-primary-600 hover:bg-primary-700 text-white text-sm rounded-md"
                 >
                   <Plus className="h-4 w-4 mr-1" />

@@ -1,68 +1,92 @@
 import api from './api.js';
 
-// Mock APIs are temporary until backend is integrated
 const authService = {
   login: async (credentials) => {
-    // For demo purposes, using a slight delay to simulate network request
-    // In a real app, this would call the actual API endpoint
-    // const response = await api.post('/auth/login', credentials);
-    // return response.data;
-
-    // Mock response
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
-    if (credentials.email === 'demo@agrilinkx.com' && credentials.password === 'password') {
-      return {
-        user: {
-          id: '1',
-          name: 'Demo Farmer',
-          email: 'demo@agrilinkx.com',
-          role: 'farmer',
-          bio: 'Passionate organic farmer with 10 years of experience',
-        },
-        token: 'mock-jwt-token',
-      };
+    try {
+      const response = await api.post('/auth/login', credentials);
+      
+      // Store token in localStorage for persistence
+      localStorage.setItem('token', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+      
+      return response.data;
+    } catch (error) {
+      console.error('Login error:', error.response?.data || error.message);
+      throw error;
     }
-
-    throw new Error('Invalid credentials');
   },
 
   signup: async (userData) => {
-    // For demo purposes, using a slight delay to simulate network request
-    // const response = await api.post('/auth/signup', userData);
-    // return response.data;
-
-    // Mock response
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
-    return {
-      user: {
-        id: '2',
-        name: userData.name,
-        email: userData.email,
-        role: userData.role,
-      },
-      token: 'mock-jwt-token',
-    };
+    try {
+      const response = await api.post('/auth/signup', userData);
+      
+      // Store token in localStorage for persistence
+      localStorage.setItem('token', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+      
+      return response.data;
+    } catch (error) {
+      console.error('Signup error:', error.response?.data || error.message);
+      throw error;
+    }
   },
 
   logout: async () => {
-    // In a real app, we might need to invalidate the token on the server
-    // await api.post('/auth/logout');
-
-    // For the demo, we just return
+    // Remove token and user from localStorage
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     return true;
   },
 
   getUser: async (userId) => {
-    const response = await api.get(`/auth/user/${userId}`);
-    return response.data;
+    try {
+      const response = await api.get(`/auth/user/${userId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Get user error:', error.response?.data || error.message);
+      throw error;
+    }
   },
 
   updateUser: async (userId, userData) => {
-    const response = await api.put(`/auth/user/update/${userId}`, userData);
-    return response.data;
+    try {
+      const response = await api.put(`/auth/user/update/${userId}`, userData);
+      
+      // Update user in localStorage if it's the current user
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      if (currentUser._id === userId) {
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error('Update user error:', error.response?.data || error.message);
+      throw error;
+    }
   },
+  
+  // Method to initialize auth state from localStorage
+  initializeAuth: () => {
+    const token = localStorage.getItem('token');
+    let user = null;
+    
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        user = JSON.parse(userStr);
+      }
+    } catch (error) {
+      console.error('Error parsing user from localStorage:', error);
+      // Clear invalid data
+      localStorage.removeItem('user');
+    }
+    
+    if (token && user) {
+      return { token, user, isAuthenticated: true };
+    }
+    
+    return { token: null, user: null, isAuthenticated: false };
+  }
 };
 
 export default authService;

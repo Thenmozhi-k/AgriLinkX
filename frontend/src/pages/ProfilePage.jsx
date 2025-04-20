@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useAppSelector } from '../app/hooks';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchUserPosts } from '../features/posts/postsSlice';
 import { 
   MapPin, 
   Calendar, 
@@ -15,55 +16,16 @@ import LoadingSpinner from '../components/common/LoadingSpinner';
 import PostCard from '../components/feed/PostCard';
 
 const ProfilePage = () => {
-  const { user } = useAppSelector((state) => state.auth);
+  const dispatch = useDispatch();
+  const { user } = useSelector((state) => state.auth);
+  const { userPosts, isLoading } = useSelector((state) => state.posts);
   const [activeTab, setActiveTab] = useState('posts');
-  const [isLoading, setIsLoading] = useState(false);
-  const [userPosts, setUserPosts] = useState([]);
   
   useEffect(() => {
-    const fetchUserData = async () => {
-      setIsLoading(true);
-      // In a real app, would call API to fetch user posts
-      // const response = await postService.getUserPosts(user.id);
-      // setUserPosts(response.data);
-      
-      // Mock fetch delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock posts data
-      setUserPosts([
-        {
-          id: '1',
-          userId: '1',
-          userName: user?.name || 'Demo User',
-          userAvatar: user?.avatar,
-          content: 'Just harvested our first batch of organic tomatoes this season! The yield is amazing. #OrganicFarming #Sustainability',
-          images: ['https://images.pexels.com/photos/533360/pexels-photo-533360.jpeg?auto=compress&cs=tinysrgb&w=600'],
-          likes: 24,
-          comments: 5,
-          shares: 3,
-          createdAt: '2023-05-10T10:30:00Z',
-          hashtags: ['OrganicFarming', 'Sustainability'],
-        },
-        {
-          id: '4',
-          userId: '1',
-          userName: user?.name || 'Demo User',
-          userAvatar: user?.avatar,
-          content: 'Attended the Agricultural Innovation Summit today. Lots of exciting new technologies that can help small farmers increase productivity while reducing environmental impact. Looking forward to trying some of these approaches on my farm. #AgriTech #SustainableFarming',
-          likes: 18,
-          comments: 7,
-          shares: 2,
-          createdAt: '2023-05-05T16:15:00Z',
-          hashtags: ['AgriTech', 'SustainableFarming'],
-        },
-      ]);
-      
-      setIsLoading(false);
-    };
-    
-    fetchUserData();
-  }, [user]);
+    if (user && user._id) {
+      dispatch(fetchUserPosts(user._id));
+    }
+  }, [dispatch, user]);
   
   if (!user) {
     return (
@@ -291,7 +253,7 @@ const ProfilePage = () => {
                 ) : userPosts.length > 0 ? (
                   <div className="space-y-6">
                     {userPosts.map((post) => (
-                      <PostCard key={post.id} post={post} />
+                      <PostCard key={post._id || post.id} post={post} />
                     ))}
                   </div>
                 ) : (
@@ -402,8 +364,8 @@ const ProfilePage = () => {
                       </div>
                       <div>
                         <h4 className="font-medium text-gray-900">Sustainable Agriculture</h4>
-                        <p className="text-sm text-gray-600">8,450 members</p>
-                        <p className="text-xs text-gray-500 mt-1">12 new posts today</p>
+                        <p className="text-sm text-gray-600">8,750 members</p>
+                        <p className="text-xs text-gray-500 mt-1">2 new posts today</p>
                       </div>
                     </div>
                   </div>
@@ -414,101 +376,121 @@ const ProfilePage = () => {
                         <Users className="h-8 w-8 text-blue-600" />
                       </div>
                       <div>
-                        <h4 className="font-medium text-gray-900">Punjab Farmers Association</h4>
-                        <p className="text-sm text-gray-600">5,730 members</p>
-                        <p className="text-xs text-gray-500 mt-1">3 new posts today</p>
+                        <h4 className="font-medium text-gray-900">Water Conservation Techniques</h4>
+                        <p className="text-sm text-gray-600">5,430 members</p>
+                        <p className="text-xs text-gray-500 mt-1">Active 2 hours ago</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow duration-200">
+                    <div className="flex">
+                      <div className="w-16 h-16 rounded-md bg-yellow-100 flex items-center justify-center mr-3">
+                        <Users className="h-8 w-8 text-yellow-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-gray-900">Agricultural Market Updates</h4>
+                        <p className="text-sm text-gray-600">12,100 members</p>
+                        <p className="text-xs text-gray-500 mt-1">Active 5 hours ago</p>
                       </div>
                     </div>
                   </div>
                 </div>
                 
-                <button className="w-full py-3 mt-6 bg-primary-50 hover:bg-primary-100 text-primary-700 rounded-md transition-colors duration-200 font-medium">
+                <button className="w-full py-2 mt-6 border border-primary-600 text-primary-600 hover:bg-primary-50 rounded-md font-medium">
                   Discover More Groups
                 </button>
               </div>
             )}
             
             {activeTab === 'connections' && (
-              <div className fordi="bg-white rounded-lg shadow-sm p-6">
+              <div className="bg-white rounded-lg shadow-sm p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-medium text-gray-900">Your Connections</h3>
                   <div className="flex items-center">
-                    <button className="text-primary-600 hover:text-primary-700 font-medium text-sm mr-4">
-                      Find connections
+                    <input
+                      type="text"
+                      placeholder="Search connections"
+                      className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                    <button className="ml-2 text-primary-600 hover:text-primary-700 font-medium text-sm">
+                      Manage
                     </button>
-                    <div className="relative">
-                      <button className="flex items-center text-gray-600 hover:text-gray-900 text-sm">
-                        <span>Sort by: Recent</span>
-                        <ChevronDown className="h-4 w-4 ml-1" />
-                      </button>
-                    </div>
                   </div>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow duration-200">
-                    <div className="flex">
-                      <div className="w-16 h-16 rounded-full overflow-hidden mr-3">
-                        <img 
-                          src="https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=150" 
-                          alt="Connection"
-                          className="w-full h-full object-cover" 
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-medium text-gray-900">Agricultural Expert</h4>
-                        <p className="text-sm text-gray-600">Crop Scientist at Agricultural University</p>
-                        <p className="text-xs text-gray-500 mt-1">Connected 3 months ago</p>
-                      </div>
-                      <button className="text-primary-600 hover:text-primary-700 self-start">
-                        <MessageSquare className="h-5 w-5" />
-                      </button>
+                  <div className="flex items-center p-3 border border-gray-200 rounded-lg hover:shadow-sm transition-shadow duration-200">
+                    <div className="w-12 h-12 rounded-full overflow-hidden mr-3">
+                      <img 
+                        src="https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=150" 
+                        alt="User"
+                        className="w-full h-full object-cover" 
+                      />
                     </div>
+                    <div>
+                      <h4 className="font-medium text-gray-900">Rajiv Singh</h4>
+                      <p className="text-sm text-gray-600">Organic Farmer</p>
+                    </div>
+                    <button className="ml-auto text-gray-500 hover:text-gray-700">
+                      <MessageSquare className="h-5 w-5" />
+                    </button>
                   </div>
                   
-                  <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow duration-200">
-                    <div className="flex">
-                      <div className="w-16 h-16 rounded-full overflow-hidden mr-3">
-                        <img 
-                          src="https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=150" 
-                          alt="Connection"
-                          className="w-full h-full object-cover" 
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-medium text-gray-900">AgriTech Solutions</h4>
-                        <p className="text-sm text-gray-600">Agricultural Technology Provider</p>
-                        <p className="text-xs text-gray-500 mt-1">Connected 2 months ago</p>
-                      </div>
-                      <button className="text-primary-600 hover:text-primary-700 self-start">
-                        <MessageSquare className="h-5 w-5" />
-                      </button>
+                  <div className="flex items-center p-3 border border-gray-200 rounded-lg hover:shadow-sm transition-shadow duration-200">
+                    <div className="w-12 h-12 rounded-full overflow-hidden mr-3">
+                      <img 
+                        src="https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=150" 
+                        alt="User"
+                        className="w-full h-full object-cover" 
+                      />
                     </div>
+                    <div>
+                      <h4 className="font-medium text-gray-900">Priya Sharma</h4>
+                      <p className="text-sm text-gray-600">Agricultural Scientist</p>
+                    </div>
+                    <button className="ml-auto text-gray-500 hover:text-gray-700">
+                      <MessageSquare className="h-5 w-5" />
+                    </button>
                   </div>
                   
-                  <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow duration-200">
-                    <div className="flex">
-                      <div className="w-16 h-16 rounded-full overflow-hidden mr-3">
-                        <img 
-                          src="https://images.pexels.com/photos/977402/pexels-photo-977402.jpeg?auto=compress&cs=tinysrgb&w=150" 
-                          alt="Connection"
-                          className="w-full h-full object-cover" 
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-medium text-gray-900">Organic Seed Supplier</h4>
-                        <p classNameEhre className="text-sm text-gray-600">Supplier of Organic Seeds</p>
-                        <p className="text-xs text-gray-500 mt-1">Connected 1 month ago</p>
-                      </div>
-                      <button className="text-primary-600 hover:text-primary-700 self-start">
-                        <MessageSquare className="h-5 w-5" />
-                      </button>
+                  <div className="flex items-center p-3 border border-gray-200 rounded-lg hover:shadow-sm transition-shadow duration-200">
+                    <div className="w-12 h-12 rounded-full overflow-hidden mr-3">
+                      <img 
+                        src="https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=150" 
+                        alt="User"
+                        className="w-full h-full object-cover" 
+                      />
                     </div>
+                    <div>
+                      <h4 className="font-medium text-gray-900">Amit Patel</h4>
+                      <p className="text-sm text-gray-600">Agribusiness Consultant</p>
+                    </div>
+                    <button className="ml-auto text-gray-500 hover:text-gray-700">
+                      <MessageSquare className="h-5 w-5" />
+                    </button>
+                  </div>
+                  
+                  <div className="flex items-center p-3 border border-gray-200 rounded-lg hover:shadow-sm transition-shadow duration-200">
+                    <div className="w-12 h-12 rounded-full overflow-hidden mr-3">
+                      <img 
+                        src="https://images.pexels.com/photos/1043474/pexels-photo-1043474.jpeg?auto=compress&cs=tinysrgb&w=150" 
+                        alt="User"
+                        className="w-full h-full object-cover" 
+                      />
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-900">Neha Gupta</h4>
+                      <p className="text-sm text-gray-600">Agricultural Engineer</p>
+                    </div>
+                    <button className="ml-auto text-gray-500 hover:text-gray-700">
+                      <MessageSquare className="h-5 w-5" />
+                    </button>
                   </div>
                 </div>
                 
-                <button className="w-full py-3 mt-6 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors duration-200 font-medium">
-                  View All Connections
+                <button className="w-full py-2 mt-6 text-primary-600 hover:text-primary-700 font-medium text-sm">
+                  View All Connections <ChevronDown className="h-4 w-4 inline ml-1" />
                 </button>
               </div>
             )}

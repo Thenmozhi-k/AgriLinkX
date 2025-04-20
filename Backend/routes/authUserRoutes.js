@@ -36,8 +36,7 @@ router.post(
       user = new User({
         name,
         email,
-        // password: hashedPassword,
-        password
+        password: hashedPassword, // Use the hashed password
       });
 
       await user.save();
@@ -45,8 +44,17 @@ router.post(
       // Generate JWT token
       const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
 
-      res.status(201).json({ message: "User registered successfully", token });
+      res.status(201).json({ 
+        message: "User registered successfully", 
+        token,
+        user: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+        }
+      });
     } catch (error) {
+      console.error("Signup error:", error);
       res.status(500).json({ message: "Server Error" });
     }
   }
@@ -91,6 +99,7 @@ router.post(
         },
       });
     } catch (error) {
+      console.error("Login error:", error);
       res.status(500).json({ message: "Server Error" });
     }
   }

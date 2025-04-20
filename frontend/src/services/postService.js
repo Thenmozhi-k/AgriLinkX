@@ -1,116 +1,170 @@
 import api from './api.js';
 
-// Mock data for development
-const mockPosts = [
-  {
-    id: '1',
-    userId: '1',
-    userName: 'Demo Farmer',
-    userAvatar: 'https://images.pexels.com/photos/3912578/pexels-photo-3912578.jpeg?auto=compress&cs=tinysrgb&w=150',
-    content: 'Just harvested our first batch of organic tomatoes this season! The yield is amazing. #OrganicFarming #Sustainability',
-    images: ['https://images.pexels.com/photos/533360/pexels-photo-533360.jpeg?auto=compress&cs=tinysrgb&w=600'],
-    likes: 24,
-    comments: 5,
-    shares: 3,
-    createdAt: '2023-05-10T10:30:00Z',
-    hashtags: ['OrganicFarming', 'Sustainability'],
-  },
-  {
-    id: '2',
-    userId: '3',
-    userName: 'Agricultural Expert',
-    userAvatar: 'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=150',
-    content: 'New study shows that regenerative farming practices can increase soil carbon by up to 25% in just 3 years. This is game-changing for climate-friendly agriculture! #RegenerativeFarming #ClimateAction',
-    likes: 56,
-    comments: 12,
-    shares: 18,
-    createdAt: '2023-05-09T15:20:00Z',
-    hashtags: ['RegenerativeFarming', 'ClimateAction'],
-  },
-  {
-    id: '3',
-    userId: '4',
-    userName: 'AgriTech Solutions',
-    userAvatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=150',
-    content: 'We\'re excited to announce our new IoT-based irrigation system that can reduce water usage by 30% while improving crop yields. Interested farmers can sign up for our beta program. #AgriTech #SmartFarming',
-    images: ['https://images.pexels.com/photos/927451/pexels-photo-927451.jpeg?auto=compress&cs=tinysrgb&w=600'],
-    likes: 89,
-    comments: 23,
-    shares: 31,
-    createdAt: '2023-05-08T09:15:00Z',
-    hashtags: ['AgriTech', 'SmartFarming'],
-  },
-];
-
 const postService = {
   getFeed: async () => {
-    // For demo purposes, using a slight delay to simulate network request
-    // const response = await api.get('/post');
-    // return response.data;
+    try {
+      const response = await api.get('/post/feed');
+      return response.data || [];
+    } catch (error) {
+      console.error('Error fetching feed:', error.response?.data || error.message);
+      throw error;
+    }
+  },
 
-    // Mock response
-    await new Promise(resolve => setTimeout(resolve, 800));
-    return mockPosts;
+  getAllPosts: async () => {
+    try {
+      const response = await api.get('/post/all');
+      return response.data || [];
+    } catch (error) {
+      console.error('Error fetching all posts:', error.response?.data || error.message);
+      throw error;
+    }
   },
 
   getUserPosts: async (userId) => {
-    const response = await api.get(`/post/user/${userId}`);
-    return response.data;
+    try {
+      const response = await api.get(`/post/user/${userId}`);
+      return response.data || [];
+    } catch (error) {
+      console.error('Error fetching user posts:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  getPost: async (postId) => {
+    try {
+      const response = await api.get(`/post/${postId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching post:', error.response?.data || error.message);
+      throw error;
+    }
   },
 
   createPost: async (postData) => {
-    // For demo purposes, using a mock response
-    // const formData = new FormData();
-    // formData.append('content', postData.content);
-    // if (postData.hashtags) {
-    //   formData.append('hashtags', JSON.stringify(postData.hashtags));
-    // }
-    // if (postData.images) {
-    //   postData.images.forEach(image => {
-    //     formData.append('images', image);
-    //   });
-    // }
-    // const response = await api.post('/post/create', formData, {
-    //   headers: {
-    //     'Content-Type': 'multipart/form-data',
-    //   },
-    // });
-    // return response.data;
+    try {
+      console.log('Creating post with data:', postData);
+      
+      // Create FormData object for multipart/form-data
+      const formData = new FormData();
+      
+      // Add text fields
+      formData.append('description', postData.content);
+      
+      if (postData.hashtags && postData.hashtags.length > 0) {
+        formData.append('hashtags', JSON.stringify(postData.hashtags));
+      }
+      
+      if (postData.location) {
+        formData.append('location', postData.location);
+      }
+      
+      // Add file if it exists - this is the critical part
+      if (postData.media && postData.media instanceof File) {
+        console.log('Appending file to form data:', postData.media.name, postData.media.type, postData.media.size);
+        formData.append('media', postData.media, postData.media.name);
+      }
+      
+      // Log the form data entries for debugging
+      for (let [key, value] of formData.entries()) {
+        console.log(`Form data entry - ${key}:`, value instanceof File ? `File: ${value.name}` : value);
+      }
+      
+      // Send the request with the correct content type
+      const response = await api.post('/post/create', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error creating post:', error.response?.data || error.message);
+      throw error;
+    }
+  },
 
-    // Mock response
-    await new Promise(resolve => setTimeout(resolve, 800));
+  updatePost: async (postId, postData) => {
+    try {
+      const formData = new FormData();
+      formData.append('description', postData.content);
+      
+      if (postData.hashtags && postData.hashtags.length > 0) {
+        formData.append('hashtags', JSON.stringify(postData.hashtags));
+      }
+      
+      if (postData.location) {
+        formData.append('location', postData.location);
+      }
+      
+      // Add file if it exists
+      if (postData.media && postData.media instanceof File) {
+        console.log('Appending file to form data:', postData.media.name, postData.media.type, postData.media.size);
+        formData.append('media', postData.media, postData.media.name);
+      }
+      
+      const response = await api.put(`/post/${postId}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error updating post:', error.response?.data || error.message);
+      throw error;
+    }
+  },
 
-    const mockNewPost = {
-      id: Math.random().toString(36).substring(2, 10),
-      userId: '1',
-      userName: 'Demo Farmer',
-      userAvatar: 'https://images.pexels.com/photos/3912578/pexels-photo-3912578.jpeg?auto=compress&cs=tinysrgb&w=150',
-      content: postData.content,
-      images: [],
-      likes: 0,
-      comments: 0,
-      shares: 0,
-      createdAt: new Date().toISOString(),
-      hashtags: postData.hashtags || [],
-    };
-
-    return mockNewPost;
+  deletePost: async (postId) => {
+    try {
+      const response = await api.delete(`/post/${postId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting post:', error.response?.data || error.message);
+      throw error;
+    }
   },
 
   likePost: async (postId) => {
-    const response = await api.post(`/reactions/add`, { postId, type: 'like' });
-    return response.data;
+    try {
+      const response = await api.post(`/post/${postId}/like`);
+      return response.data;
+    } catch (error) {
+      console.error('Error liking post:', error.response?.data || error.message);
+      throw error;
+    }
   },
 
   commentOnPost: async (postId, content) => {
-    const response = await api.post(`/comments/add`, { postId, content });
-    return response.data;
+    try {
+      const response = await api.post(`/post/${postId}/comment`, { content });
+      return response.data;
+    } catch (error) {
+      console.error('Error commenting on post:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  getComments: async (postId) => {
+    try {
+      const response = await api.get(`/post/${postId}/comments`);
+      return response.data || [];
+    } catch (error) {
+      console.error('Error fetching comments:', error.response?.data || error.message);
+      throw error;
+    }
   },
 
   sharePost: async (postId, caption) => {
-    const response = await api.post(`/share/post/${postId}`, { caption });
-    return response.data;
-  },
+    try {
+      const response = await api.post(`/post/${postId}/share`, { caption });
+      return response.data;
+    } catch (error) {
+      console.error('Error sharing post:', error.response?.data || error.message);
+      throw error;
+    }
+  }
 };
 
 export default postService;

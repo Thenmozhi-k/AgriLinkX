@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../../app/hooks'; // Ensure correct path
 import { logout } from '../../features/auth/authSlice';
@@ -21,6 +21,10 @@ const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState('login');
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  
+  const profileDropdownRef = useRef(null);
+  const profileButtonRef = useRef(null);
 
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -28,14 +32,38 @@ const Header = () => {
   const { isAuthenticated, user } = useAppSelector((state) => state.auth);
   const { unreadCount } = useAppSelector((state) => state.notifications);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (
+        profileDropdownRef.current && 
+        !profileDropdownRef.current.contains(event.target) &&
+        profileButtonRef.current &&
+        !profileButtonRef.current.contains(event.target)
+      ) {
+        setShowProfileDropdown(false);
+      }
+    }
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   const handleLogout = () => {
     dispatch(logout());
     navigate('/');
+    setShowProfileDropdown(false);
   };
 
   const openAuthModal = (mode) => {
     setAuthMode(mode);
     setShowAuthModal(true);
+  };
+
+  const toggleProfileDropdown = () => {
+    setShowProfileDropdown(!showProfileDropdown);
   };
 
   // Check if the current path matches the given path
@@ -208,37 +236,63 @@ const Header = () => {
           </nav>
 
           <div className="flex items-center space-x-3">
-            <div className="relative group">
-              <button className="flex items-center space-x-1">
+            <div className="relative">
+              <button 
+                ref={profileButtonRef}
+                onClick={toggleProfileDropdown}
+                className="flex items-center space-x-1 focus:outline-none"
+                aria-expanded={showProfileDropdown}
+                aria-haspopup="true"
+              >
                 <div className="w-8 h-8 rounded-full overflow-hidden">
                   {user?.avatar ? (
                     <img src={user.avatar} alt={user?.name} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-primary-100 text-primary-700 text-lg font-medium">
-                      {user?.name.charAt(0)}
+                      {user?.name?.charAt(0) || 'U'}
                     </div>
                   )}
                 </div>
                 <div className="hidden md:flex items-center space-x-1">
                   <span className="text-sm">Me</span>
-                  <ChevronDown className="h-4 w-4" />
+                  <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showProfileDropdown ? 'transform rotate-180' : ''}`} />
                 </div>
               </button>
 
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 hidden group-hover:block">
-                <Link to="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                  View Profile
-                </Link>
-                <Link to="/settings" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                  Settings
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              {showProfileDropdown && (
+                <div 
+                  ref={profileDropdownRef}
+                  className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-20 transition-all duration-200 ease-in-out"
                 >
-                  Sign Out
-                </button>
-              </div>
+                  <div className="px-4 py-3 border-b border-gray-100">
+                    <p className="text-sm font-medium text-gray-900">{user?.name}</p>
+                    <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                  </div>
+                  <Link 
+                    to="/profile" 
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    onClick={() => setShowProfileDropdown(false)}
+                  >
+                    View Profile
+                  </Link>
+                  <Link 
+                    to="/settings" 
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    onClick={() => setShowProfileDropdown(false)}
+                  >
+                    Settings
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 border-t border-gray-100"
+                  >
+                    <div className="flex items-center">
+                      <LogOut className="h-4 w-4 mr-2" />
+                      <span>Sign Out</span>
+                    </div>
+                  </button>
+                </div>
+              )}
             </div>
 
             <button className="md:hidden text-gray-700" onClick={() => setIsMenuOpen(!isMenuOpen)}>
@@ -247,80 +301,79 @@ const Header = () => {
           </div>
         </div>
 
-        {/* Mobile Search */}
-        <div className="mt-2 md:hidden">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search AgriLinkX"
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
-          </div>
-        </div>
-
         {/* Mobile Menu */}
         {isMenuOpen && (
-          <div className="md:hidden bg-white py-2 shadow-inner mt-2 animate-fade-in">
-            <nav className="flex flex-col">
+          <div className="md:hidden bg-white py-2 mt-2 shadow-inner animate-fade-in">
+            <div className="relative mx-4 mb-3">
+              <input
+                type="text"
+                placeholder="Search AgriLinkX"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
+            </div>
+
+            <nav className="flex flex-col space-y-1">
               <Link
                 to="/home"
-                className={`flex items-center space-x-3 px-4 py-3 ${
-                  isActive('/home') ? 'text-primary-700 bg-primary-50' : 'text-gray-700 hover:bg-gray-50'
+                className={`flex items-center space-x-3 px-4 py-2 ${
+                  isActive('/home') ? 'bg-primary-50 text-primary-700' : 'text-gray-700'
                 }`}
                 onClick={() => setIsMenuOpen(false)}
               >
-                <Home className="h-6 w-6" />
+                <Home className="h-5 w-5" />
                 <span>Home</span>
               </Link>
               <Link
                 to="/connections"
-                className={`flex items-center space-x-3 px-4 py-3 ${
-                  isActive('/connections') ? 'text-primary-700 bg-primary-50' : 'text-gray-700 hover:bg-gray-50'
+                className={`flex items-center space-x-3 px-4 py-2 ${
+                  isActive('/connections') ? 'bg-primary-50 text-primary-700' : 'text-gray-700'
                 }`}
                 onClick={() => setIsMenuOpen(false)}
               >
-                <Users className="h-6 w-6" />
+                <Users className="h-5 w-5" />
                 <span>My Network</span>
               </Link>
               <Link
                 to="/messages"
-                className={`flex items-center space-x-3 px-4 py-3 ${
-                  isActive('/messages') ? 'text-primary-700 bg-primary-50' : 'text-gray-700 hover:bg-gray-50'
+                className={`flex items-center space-x-3 px-4 py-2 ${
+                  isActive('/messages') ? 'bg-primary-50 text-primary-700' : 'text-gray-700'
                 }`}
                 onClick={() => setIsMenuOpen(false)}
               >
-                <MessageSquare className="h-6 w-6" />
+                <MessageSquare className="h-5 w-5" />
                 <span>Messaging</span>
               </Link>
               <Link
                 to="/notifications"
-                className={`flex items-center space-x-3 px-4 py-3 ${
-                  isActive('/notifications') ? 'text-primary-700 bg-primary-50' : 'text-gray-700 hover:bg-gray-50'
-                }`}
+                className={`flex items-center space-x-3 px-4 py-2 ${
+                  isActive('/notifications') ? 'bg-primary-50 text-primary-700' : 'text-gray-700'
+                } relative`}
                 onClick={() => setIsMenuOpen(false)}
               >
-                <Bell className="h-6 w-6" />
+                <Bell className="h-5 w-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-2 left-7 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                    {unreadCount}
+                  </span>
+                )}
                 <span>Notifications</span>
               </Link>
               <Link
                 to="/profile"
-                className={`flex items-center space-x-3 px-4 py-3 ${
-                  isActive('/profile') ? 'text-primary-700 bg-primary-50' : 'text-gray-700 hover:bg-gray-50'
+                className={`flex items-center space-x-3 px-4 py-2 ${
+                  isActive('/profile') ? 'bg-primary-50 text-primary-700' : 'text-gray-700'
                 }`}
                 onClick={() => setIsMenuOpen(false)}
               >
-                <User className="h-6 w-6" />
+                <User className="h-5 w-5" />
                 <span>My Profile</span>
               </Link>
-              <button 
-                onClick={() => {
-                  handleLogout();
-                  setIsMenuOpen(false);
-                }}
-                className="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50 w-full text-left"
+              <button
+                onClick={handleLogout}
+                className="flex items-center space-x-3 px-4 py-2 text-gray-700 w-full text-left"
               >
-                <LogOut className="h-6 w-6" />
+                <LogOut className="h-5 w-5" />
                 <span>Sign Out</span>
               </button>
             </nav>

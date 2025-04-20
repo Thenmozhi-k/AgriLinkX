@@ -1,10 +1,13 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import authService from '../../services/authService';
 
+// Initialize state from localStorage
+const storedAuth = authService.initializeAuth();
+
 const initialState = {
-  user: null,
-  token: null,
-  isAuthenticated: false,
+  user: storedAuth.user,
+  token: storedAuth.token,
+  isAuthenticated: storedAuth.isAuthenticated,
   isLoading: false,
   error: null,
 };
@@ -38,6 +41,30 @@ export const logout = createAsyncThunk('auth/logout', async () => {
   await authService.logout();
   return;
 });
+
+// Async thunk for getting user profile
+export const getUserProfile = createAsyncThunk(
+  'auth/getUserProfile',
+  async (userId, { rejectWithValue }) => {
+    try {
+      return await authService.getUser(userId);
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to get user profile');
+    }
+  }
+);
+
+// Async thunk for updating user profile
+export const updateUserProfile = createAsyncThunk(
+  'auth/updateUserProfile',
+  async ({ userId, userData }, { rejectWithValue }) => {
+    try {
+      return await authService.updateUser(userId, userData);
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to update user profile');
+    }
+  }
+);
 
 const authSlice = createSlice({
   name: 'auth',
@@ -84,6 +111,38 @@ const authSlice = createSlice({
         state.user = null;
         state.token = null;
         state.isAuthenticated = false;
+      })
+      // Get user profile
+      .addCase(getUserProfile.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(getUserProfile.fulfilled, (state, action) => {
+        state.isLoading = false;
+        // Only update the current user if it's the same user
+        if (state.user && state.user._id === action.payload._id) {
+          state.user = action.payload;
+        }
+      })
+      .addCase(getUserProfile.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      })
+      // Update user profile
+      .addCase(updateUserProfile.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(updateUserProfile.fulfilled, (state, action) => {
+        state.isLoading = false;
+        // Only update the current user if it's the same user
+        if (state.user && state.user._id === action.payload.user._id) {
+          state.user = action.payload.user;
+        }
+      })
+      .addCase(updateUserProfile.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
       });
   },
 });
