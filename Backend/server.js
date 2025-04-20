@@ -7,6 +7,7 @@ const postRoutes = require("./routes/postRoutes");
 const hashtagRoutes = require('./routes/hashtagRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const chatRoutes = require('./routes/chatRoutes');
+const savedPostRoutes = require('./routes/savedPostRoutes');
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.use("/api/post", postRoutes);
 app.use('/api/hashtags', hashtagRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/saved-posts', savedPostRoutes);
 
 // Fix the incorrect path usage
 app.use("/uploads", express.static(path.join(__dirname, "uploads"))); 

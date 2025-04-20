@@ -11,6 +11,7 @@ import MessagesPage from './pages/MessagesPage.jsx';
 import NotificationsPage from './pages/NotificationsPage.jsx';
 import GroupsPage from './pages/GroupsPage.jsx';
 import MarketplacePage from './pages/MarketplacePage.jsx';
+import SavedPostsPage from './pages/SavedPostsPage.jsx';
 import Footer from './components/common/Footer.jsx';
 
 // Protected route component
@@ -99,6 +100,14 @@ const App = () => {
             element={
               <ProtectedRoute>
                 <MarketplacePage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/saved-posts" 
+            element={
+              <ProtectedRoute>
+                <SavedPostsPage />
               </ProtectedRoute>
             } 
           />

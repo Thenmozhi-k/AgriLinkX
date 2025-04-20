@@ -1,17 +1,38 @@
 const mongoose = require("mongoose");
 const UserPostCounter = require("./UserPostCounter");
 
+const MediaSchema = new mongoose.Schema({
+  url: { type: String, required: true },
+  type: { type: String, enum: ['image', 'video', 'document'], required: true },
+  filename: { type: String },
+  size: { type: Number },
+  width: { type: Number },
+  height: { type: Number },
+  thumbnailUrl: { type: String },
+  isLocal: { type: Boolean, default: false },
+  data: { type: String } // For storing base64 encoded data
+});
+
 const PostSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     description: { type: String, required: true },
-    media: { type: String }, // URL of image or video
+    media: [MediaSchema], // Array of media files
     hashtags: { type: [String], default: [] },
-    reactions: { type: Array, default: [] }, // Changed to Array type for simpler handling
+    reactions: [{ 
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      type: { type: String, enum: ['like', 'love', 'care', 'haha', 'wow', 'sad', 'angry'], default: 'like' },
+      createdAt: { type: Date, default: Date.now }
+    }],
     comments: [{ type: mongoose.Schema.Types.ObjectId, ref: "Comment", default: [] }],
-    shares: { type: Number, default: 0 },
-    postId: { type: Number, unique: true }, // Not required, will be generated
-    location: { type: String }
+    shares: [{
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      createdAt: { type: Date, default: Date.now }
+    }],
+    postId: { type: Number }, // User-specific post ID
+    globalPostId: { type: mongoose.Schema.Types.ObjectId, default: () => new mongoose.Types.ObjectId() }, // Global unique ID
+    location: { type: String },
+    viewCount: { type: Number, default: 0 }
   },
   { timestamps: true }
 );
@@ -25,21 +46,59 @@ PostSchema.pre("save", async function (next) {
       
       // Use the static method to get the next sequence
       const nextCount = await UserPostCounter.getNextSequence(this.userId);
-      
-      // Create a unique global postId using timestamp + userId + counter
-      // This ensures uniqueness even if multiple users create posts at the same time
-      const timestamp = Math.floor(Date.now() / 1000).toString(16); // Unix timestamp in hex
-      const userIdStr = this.userId.toString().slice(-4); // Last 4 chars of userId
-      const uniqueId = parseInt(`${timestamp}${userIdStr}${nextCount}`.slice(-9));
-      
-      console.log("Generated unique postId:", uniqueId);
-      this.postId = uniqueId;
+      this.postId = nextCount;
     }
+    
+    // Extract hashtags from description if not already provided
+    if (this.description && (!this.hashtags || this.hashtags.length === 0)) {
+      const hashtagRegex = /#(\w+)/g;
+      const matches = this.description.match(hashtagRegex);
+      
+      if (matches) {
+        this.hashtags = matches.map(tag => tag.substring(1));
+      }
+    }
+    
     next();
   } catch (error) {
-    console.error("Error in PostSchema pre-save middleware:", error);
     next(error);
   }
 });
+
+// Virtual for reaction counts
+PostSchema.virtual('reactionCounts').get(function() {
+  const counts = {};
+  this.reactions.forEach(reaction => {
+    counts[reaction.type] = (counts[reaction.type] || 0) + 1;
+  });
+  return counts;
+});
+
+// Virtual for total reaction count
+PostSchema.virtual('totalReactions').get(function() {
+  return this.reactions.length;
+});
+
+// Virtual for comment count
+PostSchema.virtual('commentCount').get(function() {
+  return this.comments.length;
+});
+
+// Virtual for share count
+PostSchema.virtual('shareCount').get(function() {
+  return this.shares.length;
+});
+
+// Virtual for media count
+PostSchema.virtual('mediaCount').get(function() {
+  return this.media.length;
+});
+
+// Configure toJSON to include virtuals
+PostSchema.set('toJSON', { virtuals: true });
+PostSchema.set('toObject', { virtuals: true });
+
+// Create a composite unique index on userId and postId
+PostSchema.index({ userId: 1, postId: 1 }, { unique: true });
 
 module.exports = mongoose.model("Post", PostSchema);
