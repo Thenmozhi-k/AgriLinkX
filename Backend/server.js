@@ -20,7 +20,7 @@ connectDB();
 
 // Routes
 app.use("/api/auth", require("./routes/authUserRoutes"));
-app.use("/api", require("./routes/connectionRoutes"));
+app.use("/api/connections", require("./routes/connectionRoutes"));
 app.use("/api/post", postRoutes);
 app.use('/api/hashtags', hashtagRoutes);
 app.use('/api/notifications', notificationRoutes);

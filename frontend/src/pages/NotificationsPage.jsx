@@ -1,14 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchNotifications, markAsRead } from '../features/notifications/notificationsSlice';
-import { Bell, Heart, MessageSquare, UserPlus, AlertTriangle, Calendar, X, Check, ChevronRight } from 'lucide-react';
+import { fetchNotifications, markAsRead, markAllAsRead } from '../features/notifications/notificationsSlice';
+import { Bell, Heart, MessageSquare, UserPlus, AlertTriangle, Calendar, X, Check, ChevronRight, UserCheck } from 'lucide-react';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { Link } from 'react-router-dom';
+import { acceptFollowRequest, followUser } from '../features/user/userSlice';
 
 export default function NotificationsPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState(null);
   const [filter, setFilter] = useState('all');
+  const [processingActions, setProcessingActions] = useState({});
+  const [localReadStatus, setLocalReadStatus] = useState({});
+  const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
+  const [acceptedRequests, setAcceptedRequests] = useState({});
   
   const dispatch = useDispatch();
   const { items: notifications, isLoading, unreadCount } = useSelector((state) => state.notifications);
@@ -17,12 +22,84 @@ export default function NotificationsPage() {
     dispatch(fetchNotifications());
   }, [dispatch]);
   
+  // Initialize local read status when notifications change
+  useEffect(() => {
+    const initialReadStatus = {};
+    notifications.forEach(notification => {
+      initialReadStatus[notification.id || notification._id] = notification.isRead;
+    });
+    setLocalReadStatus(initialReadStatus);
+  }, [notifications]);
+  
   const handleNotificationClick = (notification) => {
+    const notificationId = notification.id || notification._id;
+    
+    // Update local state immediately for a responsive UI
+    setLocalReadStatus(prev => ({
+      ...prev,
+      [notificationId]: true
+    }));
+    
     setSelectedNotification(notification);
     setIsDrawerOpen(true);
     
+    // Mark as read in the backend if not already read
     if (!notification.isRead) {
-      dispatch(markAsRead(notification.id));
+      dispatch(markAsRead(notificationId))
+        .unwrap()
+        .then(() => {
+          console.log('Notification marked as read:', notificationId);
+        })
+        .catch(error => {
+          console.error('Error marking notification as read:', error);
+          // Revert local state if the API call fails
+          setLocalReadStatus(prev => ({
+            ...prev,
+            [notificationId]: false
+          }));
+        });
+    }
+  };
+
+  const handleCloseDrawer = () => {
+    setIsDrawerOpen(false);
+    // Refresh notifications to get updated read status
+    dispatch(fetchNotifications());
+  };
+
+  const handleAcceptFollowRequest = async (notification, followBack = false) => {
+    if (!notification.sender || processingActions[notification.id]) return;
+    
+    const notificationId = notification.id || notification._id;
+
+    try {
+      setProcessingActions(prev => ({ ...prev, [notificationId]: true }));
+      
+      // Accept the follow request
+      await dispatch(acceptFollowRequest(notification.sender)).unwrap();
+      
+      // If followBack is true, also follow the user back
+      if (followBack) {
+        await dispatch(followUser(notification.sender)).unwrap();
+      }
+      
+      // Mark this request as accepted in local state
+      setAcceptedRequests(prev => ({
+        ...prev,
+        [notificationId]: {
+          accepted: true,
+          followedBack: followBack
+        }
+      }));
+      
+      // Refresh notifications
+      dispatch(fetchNotifications());
+      
+      // Don't close the drawer so user can see the "Accepted" message
+    } catch (error) {
+      console.error('Error handling follow request:', error);
+    } finally {
+      setProcessingActions(prev => ({ ...prev, [notificationId]: false }));
     }
   };
   
@@ -63,11 +140,53 @@ export default function NotificationsPage() {
     }
   };
   
+  // Use local read status for filtering
   const filteredNotifications = notifications.filter(notification => {
+    const notificationId = notification.id || notification._id;
+    const isRead = localReadStatus[notificationId] !== undefined 
+      ? localReadStatus[notificationId] 
+      : notification.isRead;
+      
     if (filter === 'all') return true;
-    if (filter === 'unread') return !notification.isRead;
+    if (filter === 'unread') return !isRead;
     return notification.type === filter;
   });
+  
+  // Handle mark all as read
+  const handleMarkAllAsRead = () => {
+    if (isMarkingAllRead) return;
+    
+    setIsMarkingAllRead(true);
+    
+    // Update local state immediately
+    const updatedReadStatus = { ...localReadStatus };
+    notifications.forEach(notification => {
+      const notificationId = notification.id || notification._id;
+      updatedReadStatus[notificationId] = true;
+    });
+    setLocalReadStatus(updatedReadStatus);
+    
+    // Update in backend using the proper thunk action
+    dispatch(markAllAsRead())
+      .unwrap()
+      .then(() => {
+        console.log('All notifications marked as read');
+        dispatch(fetchNotifications());
+        setIsMarkingAllRead(false);
+      })
+      .catch(error => {
+        console.error('Error marking all notifications as read:', error);
+        setIsMarkingAllRead(false);
+        
+        // Revert local state if the API call fails
+        const revertedReadStatus = { ...localReadStatus };
+        notifications.forEach(notification => {
+          const notificationId = notification.id || notification._id;
+          revertedReadStatus[notificationId] = notification.isRead;
+        });
+        setLocalReadStatus(revertedReadStatus);
+      });
+  };
   
   if (isLoading && notifications.length === 0) {
     return (
@@ -104,32 +223,55 @@ export default function NotificationsPage() {
             >
               Unread
             </button>
+            {notifications.some(notification => !notification.isRead) && (
+              <button 
+                className="px-3 py-1 rounded-full text-sm font-medium bg-gray-200 text-gray-700 hover:bg-gray-300 flex items-center"
+                onClick={handleMarkAllAsRead}
+                disabled={isMarkingAllRead}
+              >
+                {isMarkingAllRead ? (
+                  <>
+                    <LoadingSpinner size="xs" className="mr-1" />
+                    Marking...
+                  </>
+                ) : (
+                  'Mark all as read'
+                )}
+              </button>
+            )}
           </div>
         </div>
         
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           {filteredNotifications.length > 0 ? (
             <div className="divide-y divide-gray-100">
-              {filteredNotifications.map((notification) => (
-                <button
-                  key={notification.id}
-                  className={`w-full text-left p-4 hover:bg-gray-50 flex items-start transition-colors duration-200 ${
-                    !notification.isRead ? 'bg-primary-50' : ''
-                  }`}
-                  onClick={() => handleNotificationClick(notification)}
-                >
-                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3 flex-shrink-0">
-                    {getNotificationIcon(notification.type)}
-                  </div>
-                  <div className="flex-1">
-                    <p className={`text-gray-900 ${!notification.isRead ? 'font-medium' : ''}`}>
-                      {notification.message}
-                    </p>
-                    <p className="text-gray-500 text-sm mt-1">{formatDate(notification.createdAt)}</p>
-                  </div>
-                  <ChevronRight className="h-5 w-5 text-gray-400 ml-2 flex-shrink-0" />
-                </button>
-              ))}
+              {filteredNotifications.map((notification) => {
+                const notificationId = notification.id || notification._id;
+                const isRead = localReadStatus[notificationId] !== undefined 
+                  ? localReadStatus[notificationId] 
+                  : notification.isRead;
+                
+                return (
+                  <button
+                    key={notificationId}
+                    className={`w-full text-left p-4 hover:bg-gray-50 flex items-start transition-colors duration-200 ${
+                      !isRead ? 'bg-primary-50' : ''
+                    }`}
+                    onClick={() => handleNotificationClick(notification)}
+                  >
+                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3 flex-shrink-0">
+                      {getNotificationIcon(notification.type)}
+                    </div>
+                    <div className="flex-1">
+                      <p className={`text-gray-900 ${!isRead ? 'font-medium' : ''}`}>
+                        {notification.message}
+                      </p>
+                      <p className="text-gray-500 text-sm mt-1">{formatDate(notification.createdAt)}</p>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-gray-400 ml-2 flex-shrink-0" />
+                  </button>
+                );
+              })}
             </div>
           ) : (
             <div className="py-12 text-center">
@@ -159,7 +301,7 @@ export default function NotificationsPage() {
               <h2 className="text-lg font-bold text-gray-900">Notification Details</h2>
               <button 
                 className="text-gray-500 hover:text-gray-700"
-                onClick={() => setIsDrawerOpen(false)}
+                onClick={handleCloseDrawer}
               >
                 <X className="h-6 w-6" />
               </button>
@@ -190,43 +332,70 @@ export default function NotificationsPage() {
                 </p>
               </div>
               
+              {/* Follow request actions */}
+              {selectedNotification.type === 'follow' && 
+                selectedNotification.sender && 
+                selectedNotification.message.includes('requested to follow you') && (
+                  <div className="flex flex-col space-y-3 mb-6">
+                    {acceptedRequests[selectedNotification.id || selectedNotification._id] ? (
+                      <div className="bg-green-100 text-green-800 p-4 rounded-md flex items-center">
+                        <Check className="h-5 w-5 mr-2 text-green-600" />
+                        <span>
+                          {acceptedRequests[selectedNotification.id || selectedNotification._id].followedBack
+                            ? 'Accepted and followed back'
+                            : 'Request accepted'}
+                        </span>
+                      </div>
+                    ) : (
+                      <>
+                        <button 
+                          onClick={() => handleAcceptFollowRequest(selectedNotification)}
+                          disabled={processingActions[selectedNotification.id]}
+                          className="flex items-center justify-center px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
+                        >
+                          {processingActions[selectedNotification.id] ? (
+                            <LoadingSpinner size="sm" color="white" />
+                          ) : (
+                            <>
+                              <Check className="h-5 w-5 mr-2" />
+                              Accept
+                            </>
+                          )}
+                        </button>
+                        
+                        <button 
+                          onClick={() => handleAcceptFollowRequest(selectedNotification, true)}
+                          disabled={processingActions[selectedNotification.id]}
+                          className="flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                        >
+                          {processingActions[selectedNotification.id] ? (
+                            <LoadingSpinner size="sm" color="white" />
+                          ) : (
+                            <>
+                              <UserCheck className="h-5 w-5 mr-2" />
+                              Accept & Follow Back
+                            </>
+                          )}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )
+              }
+              
               {selectedNotification.actionUrl && (
                 <Link 
                   to={selectedNotification.actionUrl}
                   className="block w-full bg-primary-600 text-white text-center py-3 rounded-md hover:bg-primary-700 transition-colors duration-200"
-                  onClick={() => setIsDrawerOpen(false)}
+                  onClick={handleCloseDrawer}
                 >
                   View Details
                 </Link>
               )}
             </div>
-            
-            <div className="p-4 border-t border-gray-200">
-              <div className="flex space-x-3">
-                <button 
-                  className="flex-1 flex items-center justify-center py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors duration-200"
-                  onClick={() => setIsDrawerOpen(false)}
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  Dismiss
-                </button>
-                <button className="flex-1 flex items-center justify-center py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors duration-200">
-                  <Check className="h-4 w-4 mr-2" />
-                  Mark as Read
-                </button>
-              </div>
-            </div>
           </div>
         )}
       </div>
-      
-      {/* Overlay when drawer is open */}
-      {isDrawerOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
-          onClick={() => setIsDrawerOpen(false)}
-        ></div>
-      )}
     </div>
   );
 }

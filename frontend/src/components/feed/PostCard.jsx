@@ -1,9 +1,10 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { MessageSquare, Heart, Share2, MoreHorizontal, ThumbsUp, MapPin, Edit, Trash2, Bookmark, BookmarkCheck } from 'lucide-react';
+import { MessageSquare, Heart, Share2, MoreHorizontal, ThumbsUp, MapPin, Edit, Trash2, Bookmark, BookmarkCheck, UserPlus, UserMinus, UserCheck, Loader } from 'lucide-react';
 import timeAgo from '../../utils/timeAgo';
 import PostMediaGallery from './PostMediaGallery';
 import { useDispatch, useSelector } from 'react-redux';
 import { reactToPost, deletePost, savePost, unsavePost, checkSavedPost } from '../../features/posts/postsSlice';
+import { followUser, unfollowUser, checkFollowingStatus } from '../../features/user/userSlice';
 import ReactionDetailsModal from '../modals/ReactionDetailsModal';
 import CommentSection from '../comments/CommentSection';
 import SharePostModal from '../modals/SharePostModal';
@@ -33,10 +34,16 @@ const PostCard = ({ post }) => {
   const [reactionError, setReactionError] = useState(null);
   const [isSaved, setIsSaved] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [followStatus, setFollowStatus] = useState({
+    isFollowing: false,
+    hasRequestedToFollow: false,
+    connectionStatus: null,
+    isLoading: false,
+    isRequesting: false
+  });
   const dropdownRef = useRef(null);
   const currentUser = useSelector(state => state.auth.user);
   
-  // Create a safe local copy of post data
   const postData = useMemo(() => {
     console.log("Post data:", post);
     
@@ -62,7 +69,6 @@ const PostCard = ({ post }) => {
     };
   }, [post]);
   
-  // Check if the current user is the post author
   const isAuthor = useMemo(() => {
     if (!currentUser) {
       console.log('No current user found');
@@ -74,7 +80,6 @@ const PostCard = ({ post }) => {
       return false;
     }
     
-    // Extract post user ID, handling different formats
     let postUserId;
     if (typeof post.userId === 'object') {
       postUserId = post.userId._id || post.userId.id;
@@ -82,7 +87,6 @@ const PostCard = ({ post }) => {
       postUserId = post.userId;
     }
     
-    // Extract current user ID, handling different formats
     const currentUserId = currentUser.id || currentUser._id;
     
     console.log('Post author check:', {
@@ -93,20 +97,109 @@ const PostCard = ({ post }) => {
       isMatch: String(postUserId) === String(currentUserId)
     });
     
-    // Convert both to strings to ensure consistent comparison
     return String(postUserId) === String(currentUserId);
   }, [currentUser, post.userId, postData.userId]);
   
-  // Determine if we're on the profile page
+  const getPostAuthorId = () => {
+    if (typeof post.userId === 'object') {
+      return post.userId._id || post.userId.id;
+    }
+    return post.userId;
+  };
+  
+  useEffect(() => {
+    const checkFollowStatus = async () => {
+      if (isAuthor || !currentUser) return;
+      
+      const postAuthorId = getPostAuthorId();
+      if (!postAuthorId) return;
+      
+      try {
+        setFollowStatus(prev => ({ ...prev, isLoading: true }));
+        const result = await dispatch(checkFollowingStatus(postAuthorId)).unwrap();
+        console.log('Follow status check result:', result, 'for post author:', postAuthorId);
+        
+        // Debug information
+        if (result.isFollowing) {
+          console.log('User is following this author');
+        } else if (result.hasRequestedToFollow) {
+          console.log('User has requested to follow this author');
+        } else {
+          console.log('User is not following this author');
+        }
+        
+        setFollowStatus({
+          isFollowing: result.isFollowing,
+          hasRequestedToFollow: result.hasRequestedToFollow,
+          connectionStatus: result.connectionStatus,
+          isLoading: false,
+          isRequesting: false
+        });
+      } catch (error) {
+        console.error('Error checking follow status:', error);
+        setFollowStatus(prev => ({ ...prev, isLoading: false, isRequesting: false }));
+      }
+    };
+    
+    checkFollowStatus();
+  }, [dispatch, isAuthor, currentUser, post.userId]);
+
+  const handleFollowToggle = async () => {
+    if (isAuthor || !currentUser) return;
+    
+    const postAuthorId = getPostAuthorId();
+    if (!postAuthorId) return;
+    
+    if (followStatus.isFollowing || followStatus.hasRequestedToFollow || followStatus.connectionStatus === 'following' || followStatus.connectionStatus === 'requested') {
+      setFollowStatus(prev => ({ ...prev, isLoading: true }));
+      
+      try {
+        await dispatch(unfollowUser(postAuthorId)).unwrap();
+        console.log('Successfully unfollowed user');
+        
+        const updatedStatus = await dispatch(checkFollowingStatus(postAuthorId)).unwrap();
+        setFollowStatus({
+          isFollowing: updatedStatus.isFollowing,
+          hasRequestedToFollow: updatedStatus.hasRequestedToFollow,
+          connectionStatus: updatedStatus.connectionStatus,
+          isLoading: false,
+          isRequesting: false
+        });
+      } catch (error) {
+        console.error('Error unfollowing user:', error);
+        setFollowStatus(prev => ({ ...prev, isLoading: false, isRequesting: false }));
+      }
+    } else {
+      setFollowStatus(prev => ({ ...prev, isRequesting: true, isLoading: true }));
+      
+      try {
+        await dispatch(followUser(postAuthorId)).unwrap();
+        console.log('Follow request sent');
+        
+        const updatedStatus = await dispatch(checkFollowingStatus(postAuthorId)).unwrap();
+        setFollowStatus({
+          isFollowing: updatedStatus.isFollowing,
+          hasRequestedToFollow: updatedStatus.hasRequestedToFollow,
+          connectionStatus: updatedStatus.connectionStatus,
+          isLoading: false,
+          isRequesting: false
+        });
+      } catch (error) {
+        console.error('Error following user:', error);
+        setFollowStatus(prev => ({ ...prev, isLoading: false, isRequesting: false }));
+      }
+    }
+    
+    setShowDropdown(false);
+  };
+  
   const isProfilePage = location.pathname.includes('/profile');
-  // Determine if we're on the home page
   const isHomePage = location.pathname === '/home';
   
   const handleReaction = (reactionType) => {
     console.log(`Reacting to post ${postData.id} with reaction: ${reactionType}`);
     setReactionError(null);
     
-    // Ensure we have a valid reaction type
     const validReactionTypes = ['like', 'love', 'care', 'haha', 'wow', 'sad', 'angry'];
     if (!validReactionTypes.includes(reactionType)) {
       console.error('Invalid reaction type:', reactionType);
@@ -139,7 +232,6 @@ const PostCard = ({ post }) => {
     setShowShareModal(true);
   };
   
-  // Safely format content with hashtag highlighting
   const renderContent = () => {
     if (!postData.content || typeof postData.content !== 'string') {
       return null;
@@ -157,7 +249,6 @@ const PostCard = ({ post }) => {
     });
   };
   
-  // Get post date safely
   const getPostDate = () => {
     try {
       return timeAgo(new Date(postData.createdAt));
@@ -166,7 +257,6 @@ const PostCard = ({ post }) => {
     }
   };
   
-  // Get reaction counts
   const getReactionCounts = () => {
     const totalCount = postData.totalReactions || 0;
     
@@ -213,7 +303,6 @@ const PostCard = ({ post }) => {
     );
   };
   
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -227,7 +316,6 @@ const PostCard = ({ post }) => {
     };
   }, []);
   
-  // Check if post is saved when component mounts
   useEffect(() => {
     const checkPostSavedStatus = async () => {
       if (post._id) {
@@ -243,7 +331,6 @@ const PostCard = ({ post }) => {
     checkPostSavedStatus();
   }, [dispatch, post._id]);
 
-  // Toggle save post
   const handleSavePost = () => {
     if (isSaved) {
       dispatch(unsavePost(postData.id))
@@ -268,14 +355,12 @@ const PostCard = ({ post }) => {
     }
   };
   
-  // Handle post deletion
   const handleDeletePost = () => {
     if (window.confirm('Are you sure you want to delete this post? This action cannot be undone.')) {
       setIsDeleting(true);
       dispatch(deletePost(postData.id))
         .unwrap()
         .then(() => {
-          // Post deleted successfully
           setShowDropdown(false);
         })
         .catch(error => {
@@ -285,6 +370,66 @@ const PostCard = ({ post }) => {
     } else {
       setShowDropdown(false);
     }
+  };
+  
+  const renderFollowButton = () => {
+    if (isAuthor || !currentUser) return null;
+    
+    // Add debug logging
+    console.log('Rendering follow button with status:', {
+      isFollowing: followStatus.isFollowing,
+      connectionStatus: followStatus.connectionStatus,
+      hasRequestedToFollow: followStatus.hasRequestedToFollow,
+      isLoading: followStatus.isLoading,
+      isRequesting: followStatus.isRequesting
+    });
+    
+    // Determine if the user is following this author
+    const isFollowingAuthor = followStatus.isFollowing || followStatus.connectionStatus === 'following';
+    
+    // Determine if the user has requested to follow this author
+    const hasRequestedToFollowAuthor = followStatus.hasRequestedToFollow || followStatus.connectionStatus === 'requested';
+    
+    return (
+      <div className="ml-2">
+        {isFollowingAuthor ? (
+          <span className="px-2 py-1 rounded-md text-xs font-medium flex items-center bg-gray-200 text-gray-700">
+            <UserCheck className="w-3 h-3 mr-1" />
+            Following
+          </span>
+        ) : followStatus.isLoading ? (
+          <button
+            disabled
+            className="px-2 py-1 rounded-md text-xs font-medium flex items-center bg-gray-200 text-gray-700"
+          >
+            <Loader className="w-3 h-3 mr-1 animate-spin" />
+            Loading...
+          </button>
+        ) : followStatus.isRequesting ? (
+          <button
+            disabled
+            className="px-2 py-1 rounded-md text-xs font-medium flex items-center bg-gray-200 text-gray-700"
+          >
+            <Loader className="w-3 h-3 mr-1 animate-spin" />
+            Requesting...
+          </button>
+        ) : hasRequestedToFollowAuthor ? (
+          <span className="px-2 py-1 rounded-md text-xs font-medium flex items-center bg-gray-200 text-gray-700">
+            <UserPlus className="w-3 h-3 mr-1" />
+            Requested
+          </span>
+        ) : (
+          <button
+            onClick={handleFollowToggle}
+            disabled={followStatus.isLoading}
+            className="px-2 py-1 rounded-md text-xs font-medium flex items-center bg-primary-600 text-white hover:bg-primary-700"
+          >
+            <UserPlus className="w-3 h-3 mr-1" />
+            Follow
+          </button>
+        )}
+      </div>
+    );
   };
   
   return (
@@ -301,8 +446,11 @@ const PostCard = ({ post }) => {
               </div>
             )}
           </div>
-          <div>
-            <h3 className="font-medium text-gray-900">{postData.userName}</h3>
+          <div className="flex flex-col">
+            <div className="flex items-center">
+              <h3 className="font-medium text-gray-900">{postData.userName}</h3>
+              {renderFollowButton()}
+            </div>
             <div className="flex items-center text-gray-500 text-sm">
               {postData.userRole && (
                 <span className="capitalize mr-2">{postData.userRole}</span>
@@ -355,6 +503,18 @@ const PostCard = ({ post }) => {
                     {isDeleting ? 'Deleting...' : 'Delete Post'}
                   </button>
                 </>
+              )}
+              
+              {!isAuthor && currentUser && (followStatus.isFollowing || followStatus.hasRequestedToFollow || 
+                followStatus.connectionStatus === 'following' || followStatus.connectionStatus === 'requested') && (
+                <button 
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                  onClick={handleFollowToggle}
+                  disabled={followStatus.isLoading || followStatus.isRequesting}
+                >
+                  <UserMinus className="h-4 w-4 mr-2" />
+                  {followStatus.isFollowing || followStatus.connectionStatus === 'following' ? 'Unfollow' : 'Cancel Request'}
+                </button>
               )}
               
               <button 

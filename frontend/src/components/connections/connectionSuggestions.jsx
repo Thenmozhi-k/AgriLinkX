@@ -7,18 +7,21 @@ const ConnectionSuggestions = ({ compact = false, maxSuggestions = 3 }) => {
   const dispatch = useDispatch();
   const { profile, isLoading } = useSelector(state => state.user);
   const suggestions = profile?.suggestions || [];
+  
+  // Use a ref to track if we've already fetched suggestions
   const hasFetchedRef = useRef(false);
   
   useEffect(() => {
-    // Only fetch suggestions once when the component mounts
-    if (!hasFetchedRef.current && !isLoading) {
+    // Only fetch suggestions if:
+    // 1. We haven't fetched them before
+    // 2. We're not currently loading
+    // 3. We don't already have suggestions
+    if (!hasFetchedRef.current && !isLoading && suggestions.length === 0) {
+      console.log('Fetching suggestions...');
       hasFetchedRef.current = true;
       dispatch(fetchSuggestions());
     }
-  }, [dispatch, isLoading]);
-  
-  // Add some console logs to debug
-  console.log('ConnectionSuggestions - Redux state:', { profile, isLoading, suggestions });
+  }, [dispatch, isLoading]); // Remove suggestions from dependency array
   
   const displaySuggestions = suggestions.slice(0, maxSuggestions);
   
@@ -29,7 +32,7 @@ const ConnectionSuggestions = ({ compact = false, maxSuggestions = 3 }) => {
           <div className="text-center py-2">
             <p className="text-sm text-gray-500">Loading suggestions...</p>
           </div>
-        ) : !displaySuggestions || displaySuggestions.length === 0 ? (
+        ) : displaySuggestions.length === 0 ? (
           <div className="text-center py-2">
             <p className="text-sm text-gray-500">No suggestions available</p>
           </div>
@@ -56,7 +59,7 @@ const ConnectionSuggestions = ({ compact = false, maxSuggestions = 3 }) => {
           ))
         )}
         
-        {!isLoading && displaySuggestions && displaySuggestions.length > 0 && (
+        {!isLoading && displaySuggestions.length > 0 && (
           <div className="text-center pt-2">
             <a href="#" className="text-xs text-primary-600 hover:underline">
               View all suggestions
@@ -69,13 +72,15 @@ const ConnectionSuggestions = ({ compact = false, maxSuggestions = 3 }) => {
   
   return (
     <div className="bg-white rounded-lg shadow-sm p-4">
-      <h3 className="font-semibold text-gray-800 mb-4">People You May Know</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-medium text-gray-900">People you may know</h3>
+      </div>
       
       {isLoading ? (
         <div className="text-center py-4">
           <p className="text-gray-500">Loading suggestions...</p>
         </div>
-      ) : !suggestions || suggestions.length === 0 ? (
+      ) : suggestions.length === 0 ? (
         <div className="text-center py-4">
           <p className="text-gray-500">No suggestions available</p>
         </div>
@@ -111,7 +116,7 @@ const ConnectionSuggestions = ({ compact = false, maxSuggestions = 3 }) => {
         </div>
       )}
       
-      {!isLoading && suggestions && suggestions.length > 0 && (
+      {!isLoading && suggestions.length > 0 && (
         <div className="mt-4 text-center">
           <a href="#" className="text-primary-600 hover:underline text-sm">
             View all suggestions

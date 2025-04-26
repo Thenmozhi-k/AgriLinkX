@@ -1,91 +1,162 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchConnections, fetchSuggestions, followUser } from '../features/user/userSlice';
-import { Plus, X, UserPlus, Users, Search } from 'lucide-react';
+import { 
+  fetchConnections, 
+  fetchSuggestions, 
+  followUser, 
+  unfollowUser, 
+  fetchFollowRequests,
+  acceptFollowRequest,
+  rejectFollowRequest
+} from '../features/user/userSlice';
+import { Plus, X, UserPlus, Users, Search, UserCheck, UserMinus, UserX, Bell } from 'lucide-react';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import { Link } from 'react-router-dom';
+import ConnectionStats from '../components/connections/ConnectionStats';
+import ConnectionGrid from '../components/connections/ConnectionGrid';
 
 export default function ConnectionsPage() {
-  const [activeTab, setActiveTab] = useState('connections');
+  const [activeTab, setActiveTab] = useState('followers');
   const [searchTerm, setSearchTerm] = useState('');
+  const [processingActions, setProcessingActions] = useState({});
   
   const dispatch = useDispatch();
   const { profile, isLoading } = useSelector((state) => state.user);
   const { user } = useSelector((state) => state.auth);
-  
+  console.log(JSON.stringify(profile) + 'usss')
+  // Log profile data whenever it changes
   useEffect(() => {
-    dispatch(fetchConnections(user?.id));
-    dispatch(fetchSuggestions());
+    console.log('Current profile data:', profile);
+    console.log('Followers count:', profile?.followers?.length || 0);
+    console.log('Following count:', profile?.following?.length || 0);
+    console.log('Requests count:', profile?.followRequests?.length || 0);
+    console.log('Suggestions count:', profile?.suggestions?.length || 0);
+  }, [profile]);
+
+  // Fetch all connection data when component mounts
+  useEffect(() => {
+    if (user?.id) {
+      console.log('Fetching connection data for user:', user.id);
+      
+      // Fetch followers and following
+      dispatch(fetchConnections(user.id));
+      
+      // Fetch suggestions
+      dispatch(fetchSuggestions());
+      
+      // Fetch follow requests
+      dispatch(fetchFollowRequests());
+    }
   }, [dispatch, user?.id]);
+
+  // Refetch data when the active tab changes
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    console.log(`Tab changed to ${activeTab}`);
+    
+    if (activeTab === 'followers' || activeTab === 'following') {
+      console.log('Fetching followers/following data');
+      dispatch(fetchConnections(user.id));
+    } else if (activeTab === 'suggestions') {
+      console.log('Fetching suggestions data');
+      dispatch(fetchSuggestions());
+    } else if (activeTab === 'requests') {
+      console.log('Fetching requests data');
+      dispatch(fetchFollowRequests());
+    }
+  }, [activeTab, dispatch, user?.id]);
   
-  const handleFollow = (userId) => {
-    dispatch(followUser(userId));
+  // Handle follow action
+  const handleFollow = async (userId) => {
+    if (processingActions[userId]) return;
+    
+    try {
+      setProcessingActions(prev => ({ ...prev, [userId]: true }));
+      await dispatch(followUser(userId)).unwrap();
+      console.log('Follow request sent successfully');
+      
+      // Refetch suggestions after following a user
+      dispatch(fetchSuggestions());
+    } catch (error) {
+      console.error('Error following user:', error);
+    } finally {
+      setProcessingActions(prev => ({ ...prev, [userId]: false }));
+    }
   };
   
-  const allConnections = [...profile.followers, ...profile.following];
+  // Handle unfollow action
+  const handleUnfollow = async (userId) => {
+    if (processingActions[userId]) return;
+    
+    if (window.confirm('Are you sure you want to unfollow this user?')) {
+      try {
+        setProcessingActions(prev => ({ ...prev, [userId]: true }));
+        await dispatch(unfollowUser(userId)).unwrap();
+        console.log('Unfollowed user successfully');
+        
+        // Refetch following list after unfollowing
+        dispatch(fetchConnections(user.id));
+      } catch (error) {
+        console.error('Error unfollowing user:', error);
+      } finally {
+        setProcessingActions(prev => ({ ...prev, [userId]: false }));
+      }
+    }
+  };
   
-  const filteredConnections = allConnections.filter(connection => 
-    connection.name.toLowerCase().includes(searchTerm.toLowerCase())
+  // Handle accept follow request
+  const handleAcceptRequest = async (userId) => {
+    if (processingActions[userId]) return;
+    
+    try {
+      setProcessingActions(prev => ({ ...prev, [userId]: true }));
+      await dispatch(acceptFollowRequest(userId)).unwrap();
+      console.log('Follow request accepted successfully');
+      
+      // Refetch requests and followers after accepting
+      dispatch(fetchFollowRequests());
+      dispatch(fetchConnections(user.id));
+    } catch (error) {
+      console.error('Error accepting follow request:', error);
+    } finally {
+      setProcessingActions(prev => ({ ...prev, [userId]: false }));
+    }
+  };
+  
+  // Handle reject follow request
+  const handleRejectRequest = async (userId) => {
+    if (processingActions[userId]) return;
+    
+    try {
+      setProcessingActions(prev => ({ ...prev, [userId]: true }));
+      await dispatch(rejectFollowRequest(userId)).unwrap();
+      console.log('Follow request rejected successfully');
+      
+      // Refetch requests after rejecting
+      dispatch(fetchFollowRequests());
+    } catch (error) {
+      console.error('Error rejecting follow request:', error);
+    } finally {
+      setProcessingActions(prev => ({ ...prev, [userId]: false }));
+    }
+  };
+  
+  // Filter data based on search term - with safety checks
+  const filteredFollowers = (profile?.followers || []).filter(follower => 
+    follower?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
   
-  const filteredSuggestions = profile.suggestions.filter(suggestion => 
-    suggestion.name.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredFollowing = (profile?.following || []).filter(following => 
+    following?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
   
-  const renderConnectionCard = (connection) => (
-    <div key={connection.id} className="bg-white rounded-lg shadow-sm p-4 flex items-start">
-      <div className="w-16 h-16 rounded-full overflow-hidden mr-4">
-        {connection.avatar ? (
-          <img src={connection.avatar} alt={connection.name} className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-primary-100 text-primary-700 font-medium text-xl">
-            {connection.name.charAt(0)}
-          </div>
-        )}
-      </div>
-      <div className="flex-1">
-        <h4 className="font-medium text-gray-900 text-lg">{connection.name}</h4>
-        <p className="text-gray-600 capitalize">{connection.role}</p>
-        <div className="flex space-x-2 mt-3">
-          <button className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm rounded-md transition-colors duration-200">
-            Message
-          </button>
-          <button className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm rounded-md transition-colors duration-200">
-            View Profile
-          </button>
-        </div>
-      </div>
-    </div>
+  const filteredRequests = (profile?.followRequests || []).filter(request => 
+    request?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
   
-  const renderSuggestionCard = (suggestion) => (
-    <div key={suggestion.id} className="bg-white rounded-lg shadow-sm p-4 flex items-start">
-      <div className="w-16 h-16 rounded-full overflow-hidden mr-4">
-        {suggestion.avatar ? (
-          <img src={suggestion.avatar} alt={suggestion.name} className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-primary-100 text-primary-700 font-medium text-xl">
-            {suggestion.name.charAt(0)}
-          </div>
-        )}
-      </div>
-      <div className="flex-1">
-        <h4 className="font-medium text-gray-900 text-lg">{suggestion.name}</h4>
-        <p className="text-gray-600 capitalize">{suggestion.role}</p>
-        <div className="flex space-x-2 mt-3">
-          <button
-            onClick={() => handleFollow(suggestion.id)}
-            className="flex items-center px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm rounded-md transition-colors duration-200"
-          >
-            <UserPlus className="h-4 w-4 mr-2" />
-            Connect
-          </button>
-          <button className="flex items-center px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm rounded-md transition-colors duration-200">
-            <X className="h-4 w-4 mr-2" />
-            Dismiss
-          </button>
-        </div>
-      </div>
-    </div>
+  const filteredSuggestions = (profile?.suggestions || []).filter(suggestion => 
+    suggestion?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
   
   return (
@@ -106,22 +177,66 @@ export default function ConnectionsPage() {
           </div>
         </div>
         
+        {/* LinkedIn-like Connection Stats */}
+        {!isLoading && (
+          <ConnectionStats 
+            followers={profile?.followers} 
+            following={profile?.following}
+            userId={user?.id}
+          />
+        )}
+        
         <div className="bg-white rounded-lg shadow-sm mb-6">
-          <div className="flex border-b">
+          <div className="flex flex-wrap border-b">
             <button
+              data-tab="followers"
               className={`flex-1 py-4 text-center font-medium ${
-                activeTab === 'connections'
+                activeTab === 'followers'
                   ? 'text-primary-600 border-b-2 border-primary-600'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
-              onClick={() => setActiveTab('connections')}
+              onClick={() => setActiveTab('followers')}
             >
               <div className="flex items-center justify-center">
                 <Users className="h-5 w-5 mr-2" />
-                <span>My Connections ({allConnections.length})</span>
+                <span>Followers ({profile?.followers?.length || 0})</span>
               </div>
             </button>
             <button
+              data-tab="following"
+              className={`flex-1 py-4 text-center font-medium ${
+                activeTab === 'following'
+                  ? 'text-primary-600 border-b-2 border-primary-600'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+              onClick={() => setActiveTab('following')}
+            >
+              <div className="flex items-center justify-center">
+                <UserCheck className="h-5 w-5 mr-2" />
+                <span>Following ({profile?.following?.length || 0})</span>
+              </div>
+            </button>
+            <button
+              data-tab="requests"
+              className={`flex-1 py-4 text-center font-medium ${
+                activeTab === 'requests'
+                  ? 'text-primary-600 border-b-2 border-primary-600'
+                  : 'text-gray-600 hover:text-gray-900'
+              } ${profile?.followRequests?.length > 0 ? 'relative' : ''}`}
+              onClick={() => setActiveTab('requests')}
+            >
+              <div className="flex items-center justify-center">
+                <Bell className="h-5 w-5 mr-2" />
+                <span>Requests ({profile?.followRequests?.length || 0})</span>
+              </div>
+              {profile?.followRequests?.length > 0 && (
+                <span className="absolute top-3 right-1/4 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  {profile?.followRequests?.length}
+                </span>
+              )}
+            </button>
+            <button
+              data-tab="suggestions"
               className={`flex-1 py-4 text-center font-medium ${
                 activeTab === 'suggestions'
                   ? 'text-primary-600 border-b-2 border-primary-600'
@@ -131,7 +246,7 @@ export default function ConnectionsPage() {
             >
               <div className="flex items-center justify-center">
                 <UserPlus className="h-5 w-5 mr-2" />
-                <span>Suggestions ({profile.suggestions.length})</span>
+                <span>Suggestions ({profile?.suggestions?.length || 0})</span>
               </div>
             </button>
           </div>
@@ -142,37 +257,59 @@ export default function ConnectionsPage() {
             <LoadingSpinner size="lg" />
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {activeTab === 'connections' ? (
-              filteredConnections.length > 0 ? (
-                filteredConnections.map(renderConnectionCard)
-              ) : (
-                <div className="col-span-full text-center py-12">
-                  <div className="bg-gray-100 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4">
-                    <Users className="h-10 w-10 text-gray-500" />
-                  </div>
-                  <h3 className="text-xl font-medium text-gray-900 mb-2">No connections found</h3>
-                  <p className="text-gray-600">
-                    {searchTerm ? 'Try a different search term' : 'Start connecting with other farmers and experts'}
-                  </p>
-                </div>
-              )
-            ) : (
-              filteredSuggestions.length > 0 ? (
-                filteredSuggestions.map(renderSuggestionCard)
-              ) : (
-                <div className="col-span-full text-center py-12">
-                  <div className="bg-gray-100 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4">
-                    <UserPlus className="h-10 w-10 text-gray-500" />
-                  </div>
-                  <h3 className="text-xl font-medium text-gray-900 mb-2">No suggestions found</h3>
-                  <p className="text-gray-600">
-                    {searchTerm ? 'Try a different search term' : 'We\'ll notify you when we find new connections for you'}
-                  </p>
-                </div>
-              )
+          <>
+            {activeTab === 'followers' && (
+              <div className="mb-8">
+                <ConnectionGrid 
+                  users={filteredFollowers}
+                  type="followers"
+                  processingActions={processingActions}
+                  emptyMessage="No followers found"
+                  searchTerm={searchTerm}
+                />
+              </div>
             )}
-          </div>
+            
+            {activeTab === 'following' && (
+              <div className="mb-8">
+                <ConnectionGrid 
+                  users={filteredFollowing}
+                  type="following"
+                  onUnfollow={handleUnfollow}
+                  processingActions={processingActions}
+                  emptyMessage="Not following anyone yet"
+                  searchTerm={searchTerm}
+                />
+              </div>
+            )}
+            
+            {activeTab === 'requests' && (
+              <div className="mb-8">
+                <ConnectionGrid 
+                  users={filteredRequests}
+                  type="requests"
+                  onAccept={handleAcceptRequest}
+                  onReject={handleRejectRequest}
+                  processingActions={processingActions}
+                  emptyMessage="No pending follow requests"
+                  searchTerm={searchTerm}
+                />
+              </div>
+            )}
+            
+            {activeTab === 'suggestions' && (
+              <div className="mb-8">
+                <ConnectionGrid 
+                  users={filteredSuggestions}
+                  type="suggestions"
+                  onFollow={handleFollow}
+                  processingActions={processingActions}
+                  emptyMessage="No suggestions found"
+                  searchTerm={searchTerm}
+                />
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

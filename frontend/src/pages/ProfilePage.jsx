@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useParams, Link } from 'react-router-dom';
 import { fetchUserPosts } from '../features/posts/postsSlice';
+import { fetchUserProfile, fetchConnections, fetchMutualConnections } from '../features/user/userSlice';
 import { 
   MapPin, 
   Calendar, 
@@ -14,23 +16,57 @@ import {
 } from 'lucide-react';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import PostCard from '../components/feed/PostCard';
+import ConnectionButton from '../components/profile/ConnectionButton';
+import MutualConnections from '../components/connections/MutualConnections';
 
 const ProfilePage = () => {
+  const { userId } = useParams();
   const dispatch = useDispatch();
-  const { user } = useSelector((state) => state.auth);
-  const { userPosts, isLoading } = useSelector((state) => state.posts);
+  const { user: currentUser } = useSelector((state) => state.auth);
+  const { profile, isLoading: isProfileLoading } = useSelector((state) => state.user);
+  const { userPosts, isLoading: isPostsLoading } = useSelector((state) => state.posts);
   const [activeTab, setActiveTab] = useState('posts');
   
-  useEffect(() => {
-    if (user && user._id) {
-      dispatch(fetchUserPosts(user._id));
-    }
-  }, [dispatch, user]);
+  // Determine if we're viewing the current user's profile or another user's profile
+  const isCurrentUserProfile = !userId || userId === currentUser?.id || userId === currentUser?._id;
+  const userProfile = isCurrentUserProfile ? currentUser : profile.userDetails;
   
-  if (!user) {
+  useEffect(() => {
+    // If viewing another user's profile, fetch their profile data
+    if (!isCurrentUserProfile && userId) {
+      dispatch(fetchUserProfile(userId));
+      dispatch(fetchUserPosts(userId));
+      dispatch(fetchConnections(userId));
+      
+      // Fetch mutual connections when viewing another user's profile
+      if (currentUser?.id) {
+        dispatch(fetchMutualConnections(userId));
+      }
+    } else if (currentUser?.id) {
+      // If viewing own profile, fetch own posts
+      dispatch(fetchUserPosts(currentUser.id));
+      dispatch(fetchConnections(currentUser.id));
+    }
+  }, [dispatch, userId, currentUser, isCurrentUserProfile]);
+  
+  if (isProfileLoading || (!userProfile && !isCurrentUserProfile)) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+  
+  if (!userProfile) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="bg-white p-8 rounded-lg shadow-md text-center">
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">User Not Found</h2>
+          <p className="text-gray-600 mb-6">The user profile you're looking for doesn't exist or is no longer available.</p>
+          <Link to="/home" className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700">
+            Return to Home
+          </Link>
+        </div>
       </div>
     );
   }
@@ -51,11 +87,11 @@ const ProfilePage = () => {
             <div className="flex flex-col md:flex-row">
               {/* Profile Picture */}
               <div className="w-32 h-32 md:w-40 md:h-40 rounded-full border-4 border-white bg-white overflow-hidden">
-                {user.avatar ? (
-                  <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                {userProfile.avatar ? (
+                  <img src={userProfile.avatar} alt={userProfile.name} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-primary-100 text-primary-700 text-4xl font-semibold">
-                    {user.name.charAt(0)}
+                    {userProfile.name.charAt(0)}
                   </div>
                 )}
               </div>
@@ -63,8 +99,8 @@ const ProfilePage = () => {
               {/* Profile Info */}
               <div className="mt-4 md:mt-12 md:ml-6 flex flex-col md:flex-row justify-between w-full">
                 <div>
-                  <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{user.name}</h1>
-                  <p className="text-lg text-gray-600 capitalize">{user.role}</p>
+                  <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{userProfile.name}</h1>
+                  <p className="text-lg text-gray-600 capitalize">{userProfile.role}</p>
                   <p className="text-gray-600 mt-1">Organic Farmer specializing in sustainable agriculture</p>
                   
                   <div className="mt-3 flex flex-wrap items-center text-sm text-gray-600">
@@ -84,9 +120,13 @@ const ProfilePage = () => {
                 </div>
                 
                 <div className="flex space-x-3 mt-4 md:mt-0">
-                  <button className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors duration-200 font-medium">
-                    Edit Profile
-                  </button>
+                  {isCurrentUserProfile ? (
+                    <button className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors duration-200 font-medium">
+                      Edit Profile
+                    </button>
+                  ) : (
+                    <ConnectionButton userId={userId} />
+                  )}
                   <button className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors duration-200 font-medium">
                     Share Profile
                   </button>
@@ -117,9 +157,11 @@ const ProfilePage = () => {
             <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-semibold text-gray-900 text-lg">About</h3>
-                <button className="text-primary-600 hover:text-primary-700">
-                  <Edit className="h-4 w-4" />
-                </button>
+                {isCurrentUserProfile && (
+                  <button className="text-primary-600 hover:text-primary-700">
+                    <Edit className="h-4 w-4" />
+                  </button>
+                )}
               </div>
               
               <p className="text-gray-700 mb-4">
@@ -149,9 +191,11 @@ const ProfilePage = () => {
             <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-semibold text-gray-900 text-lg">Skills</h3>
-                <button className="text-primary-600 hover:text-primary-700">
-                  <Edit className="h-4 w-4" />
-                </button>
+                {isCurrentUserProfile && (
+                  <button className="text-primary-600 hover:text-primary-700">
+                    <Edit className="h-4 w-4" />
+                  </button>
+                )}
               </div>
               
               <div className="flex flex-wrap gap-2">
@@ -246,7 +290,7 @@ const ProfilePage = () => {
             {/* Tab Content */}
             {activeTab === 'posts' && (
               <>
-                {isLoading ? (
+                {isPostsLoading ? (
                   <div className="flex justify-center py-8">
                     <LoadingSpinner size="lg" />
                   </div>
@@ -262,9 +306,11 @@ const ProfilePage = () => {
                     <p className="text-gray-600 mb-6">
                       Start sharing your agricultural knowledge and experiences with the community.
                     </p>
-                    <button className="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors duration-200 font-medium">
-                      Create Your First Post
-                    </button>
+                    {isCurrentUserProfile && (
+                      <button className="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors duration-200 font-medium">
+                        Create Your First Post
+                      </button>
+                    )}
                   </div>
                 )}
               </>
@@ -494,6 +540,116 @@ const ProfilePage = () => {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      </div>
+      
+      {/* Profile Sidebar */}
+      <div className="w-full lg:w-1/3 space-y-6">
+        {/* Profile Card */}
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          <div className="bg-primary-600 h-24 relative">
+            {userProfile?.coverPhoto && (
+              <img 
+                src={userProfile.coverPhoto} 
+                alt="Cover" 
+                className="w-full h-full object-cover"
+              />
+            )}
+          </div>
+          
+          <div className="px-6 pb-6 relative">
+            <div className="absolute -top-12 left-6 w-24 h-24 rounded-full border-4 border-white overflow-hidden bg-white">
+              {userProfile?.avatar ? (
+                <img 
+                  src={userProfile.avatar} 
+                  alt={userProfile?.name} 
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-primary-100 text-primary-700 text-3xl font-medium">
+                  {userProfile?.name?.charAt(0) || 'U'}
+                </div>
+              )}
+            </div>
+            
+            <div className="mt-14">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">{userProfile?.name || 'User'}</h1>
+                  <p className="text-lg text-gray-600 capitalize">{userProfile?.role || 'User'}</p>
+                  
+                  {userProfile?.location && (
+                    <div className="flex items-center mt-2 text-gray-600">
+                      <MapPin className="h-4 w-4 mr-1" />
+                      <span>{userProfile.location}</span>
+                    </div>
+                  )}
+                </div>
+                
+                <div>
+                  {isCurrentUserProfile ? (
+                    <Link 
+                      to="/profile/edit" 
+                      className="flex items-center px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors duration-200"
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit Profile
+                    </Link>
+                  ) : (
+                    <div className="flex flex-col space-y-2">
+                      <ConnectionButton userId={userId} />
+                      <Link 
+                        to={`/messages/${userId}`}
+                        className="flex items-center justify-center px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-md transition-colors duration-200"
+                      >
+                        <MessageSquare className="h-4 w-4 mr-2" />
+                        Message
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {userProfile?.bio && (
+                <p className="mt-4 text-gray-700">{userProfile.bio}</p>
+              )}
+              
+              <div className="mt-4 flex flex-wrap gap-2">
+                {userProfile?.skills?.map((skill, index) => (
+                  <span 
+                    key={index}
+                    className="px-3 py-1 bg-primary-50 text-primary-700 rounded-full text-sm"
+                  >
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Mutual Connections - Only show when viewing another user's profile */}
+        {!isCurrentUserProfile && userId && currentUser?.id && (
+          <MutualConnections 
+            userId={userId} 
+            currentUserId={currentUser.id} 
+          />
+        )}
+        
+        {/* Connection Stats */}
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-medium text-gray-900">Connection Stats</h3>
+        </div>
+        
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center mr-6">
+            <span className="font-bold mr-1">120</span> 
+            <span className="text-gray-600">connections</span>
+          </div>
+          <div className="flex items-center">
+            <span className="font-bold mr-1">45</span> 
+            <span className="text-gray-600">groups</span>
           </div>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { useAppSelector } from './app/hooks.js';
+import { useAppSelector, useAppDispatch } from './app/hooks.js';
 import Header from './components/common/Header.jsx';
 import LandingPage from './pages/LandingPage.jsx';
 import HomePage from './pages/HomePage.jsx';
@@ -13,6 +13,7 @@ import GroupsPage from './pages/GroupsPage.jsx';
 import MarketplacePage from './pages/MarketplacePage.jsx';
 import SavedPostsPage from './pages/SavedPostsPage.jsx';
 import Footer from './components/common/Footer.jsx';
+import { fetchUnreadCount } from './features/notifications/notificationsSlice.jsx';
 
 // Protected route component
 const ProtectedRoute = ({ children }) => {
@@ -28,11 +29,28 @@ const ProtectedRoute = ({ children }) => {
 const App = () => {
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const location = useLocation();
+  const dispatch = useAppDispatch();
   
   // Scroll to top on route change
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [location.pathname]);
+  
+  // Fetch unread notification count for authenticated users
+  useEffect(() => {
+    if (isAuthenticated) {
+      // Fetch initial count
+      dispatch(fetchUnreadCount());
+      
+      // Set up interval to periodically fetch unread count (every 60 seconds)
+      const intervalId = setInterval(() => {
+        dispatch(fetchUnreadCount());
+      }, 60000);
+      
+      // Clean up interval on unmount
+      return () => clearInterval(intervalId);
+    }
+  }, [isAuthenticated, dispatch]);
   
   return (
     <div className="flex flex-col min-h-screen">
@@ -112,7 +130,7 @@ const App = () => {
             } 
           />
           <Route 
-            path="/agri-bot" 
+            path="/agribot" 
             element={
               <ProtectedRoute>
                 <AgriBot />
@@ -121,12 +139,11 @@ const App = () => {
           />
           
           {/* Fallback route */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to={isAuthenticated ? "/home" : "/"} replace />} />
         </Routes>
       </main>
       
-      {/* Only show footer on landing page */}
-      {!isAuthenticated && location.pathname === '/' && <Footer />}
+      {!location.pathname.includes('/messages') && <Footer />}
     </div>
   );
 };
