@@ -13,7 +13,7 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['like', 'comment', 'follow', 'system'],
+      enum: ['like', 'comment', 'follow', 'system', 'message', 'call'],
       required: true
     },
     message: {
@@ -26,6 +26,14 @@ const notificationSchema = new mongoose.Schema(
     },
     actionUrl: {
       type: String
+    },
+    relatedChatRoom: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'ChatRoom'
+    },
+    relatedMessage: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Message'
     }
   },
   { timestamps: true }

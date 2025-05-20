@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const { body, validationResult } = require("express-validator");
 const User = require("../models/User");
 const authMiddleware = require("../middleware/authMiddleware");
+const profileController = require("../controllers/profileController");
 
 const router = express.Router();
 
@@ -140,5 +141,48 @@ router.put("/user/update/:id", authMiddleware, async (req, res) => {
   }
 });
 
+// Search users endpoint
+router.get("/search", authMiddleware, async (req, res) => {
+  try {
+    const searchQuery = req.query.query;
+    if (!searchQuery) {
+      return res.status(400).json({ message: "Search query is required" });
+    }
+
+    // Search for users by name or email, excluding the current user
+    const users = await User.find({
+      $and: [
+        { _id: { $ne: req.user.id } }, // Exclude current user
+        {
+          $or: [
+            { name: { $regex: searchQuery, $options: 'i' } }, // Case-insensitive name search
+            { email: { $regex: searchQuery, $options: 'i' } } // Case-insensitive email search
+          ]
+        }
+      ]
+    }).select('_id name email avatar bio'); // Only return necessary fields
+
+    res.json(users);
+  } catch (error) {
+    console.error("Error searching users:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Profile update routes
+// Update profile information (without file upload)
+router.put("/user/update/profile", authMiddleware, profileController.updateProfile);
+
+// Update about section
+router.put("/user/update/about", authMiddleware, profileController.updateAbout);
+
+// Update skills
+router.put("/user/update/skills", authMiddleware, profileController.updateSkills);
+
+// Upload cover photo
+router.put("/user/update/cover-photo", authMiddleware, profileController.uploadMiddleware.single('coverPhoto'), profileController.uploadCoverPhoto);
+
+// Upload profile photo
+router.put("/user/update/avatar", authMiddleware, profileController.uploadMiddleware.single('avatar'), profileController.uploadProfilePhoto);
 
 module.exports = router;

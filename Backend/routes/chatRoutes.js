@@ -1,6 +1,17 @@
 const express = require('express');
-const { getChatRooms, getMessages, sendMessage, createChatRoom, getDirectChat, markRoomAsRead } = require('../controllers/chatController');
+const { 
+  getChatRooms, 
+  getMessages, 
+  sendMessage, 
+  createChatRoom, 
+  getDirectChat, 
+  markRoomAsRead,
+  uploadAttachment,
+  addReaction,
+  removeReaction
+} = require('../controllers/chatController');
 const authMiddleware = require('../middleware/authMiddleware');
+const upload = require('../middleware/upload');
 
 const router = express.Router();
 
@@ -24,5 +35,14 @@ router.get('/direct/:userId', getDirectChat);
 
 // Mark a chat room as read for the current user
 router.put('/room/:roomId/read', markRoomAsRead);
+
+// Upload file attachment
+router.post('/upload', upload.single('file'), uploadAttachment);
+
+// Add reaction to a message
+router.post('/message/:messageId/reaction', addReaction);
+
+// Remove reaction from a message
+router.delete('/message/:messageId/reaction/:emoji', removeReaction);
 
 module.exports = router;
